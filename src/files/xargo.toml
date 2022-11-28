@@ -1,0 +1,3 @@
+[project]
+name = ""
+build_command = "pdflatex"
