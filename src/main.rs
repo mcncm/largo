@@ -1,7 +1,109 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use clap::Parser;
 use serde::{Deserialize, Serialize};
+
+const PROJ_CONFIG_FILE: &'static str = "xargo.toml";
+const XARGO_CONFIG_DIR: &'static str = ".xargo";
+const XARGO_CONFIG_FILE: &'static str = "config.toml";
+const XARGO_CONFIG_DIR_FILE: &'static str = ".xargo/config.toml";
+
+#[allow(dead_code)]
+fn xargo_home() -> Option<PathBuf> {
+    // This if/else chain should optimize away, it's guaranteed to be exhaustive
+    // (unlike `#[cfg(...)]`), and rust-analyzer won't ignore the dead cases.
+    if cfg!(target_family = "unix") {
+        Some(PathBuf::from(std::env::var("HOME").ok()?))
+    } else if cfg!(target_family = "windows") {
+        Some(PathBuf::from(std::env::var("USERPROFILE").ok()?))
+    } else {
+        // The only other `target_family` at this time is `wasm`.
+        None
+    }
+}
+
+#[allow(dead_code)]
+fn xargo_global_config_path() -> Option<PathBuf> {
+    xargo_home().and_then(|mut path| {
+        path.push(XARGO_CONFIG_DIR);
+        path.push(XARGO_CONFIG_FILE);
+        Some(path)
+    })
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+struct XargoConfig {
+    tex_executable: Option<String>,
+    latex_executable: Option<String>,
+    pdftex_executable: Option<String>,
+    pdflatex_executable: Option<String>,
+    xetex_executable: Option<String>,
+    xelatex_executable: Option<String>,
+    luatex_executable: Option<String>,
+    lualatex_executable: Option<String>,
+}
+
+#[allow(dead_code)]
+// All the executable functions that you will probably want to generate with a macro
+impl XargoConfig {
+    fn tex_executable(&self) -> &str {
+        self.tex_executable.as_deref().unwrap_or("tex")
+    }
+
+    fn latex_executable(&self) -> &str {
+        self.latex_executable.as_deref().unwrap_or("latex")
+    }
+
+    fn pdftex_executable(&self) -> &str {
+        self.pdftex_executable.as_deref().unwrap_or("pdftex")
+    }
+
+    fn pdflatex_executable(&self) -> &str {
+        self.pdflatex_executable.as_deref().unwrap_or("pdflatex")
+    }
+
+    fn xetex_executable(&self) -> &str {
+        self.xetex_executable.as_deref().unwrap_or("xetex")
+    }
+
+    fn xelatex_executable(&self) -> &str {
+        self.xelatex_executable.as_deref().unwrap_or("xelatex")
+    }
+
+    fn luatex_executable(&self) -> &str {
+        self.luatex_executable.as_deref().unwrap_or("luatex")
+    }
+
+    fn lualatex_executable(&self) -> &str {
+        self.lualatex_executable.as_deref().unwrap_or("lualatex")
+    }
+}
+
+impl XargoConfig {
+    fn new() -> Self {
+        let mut builder = config::Config::builder()
+            // Use a *local* config as the primary source.
+            .add_source(config::File::new(
+                XARGO_CONFIG_DIR_FILE,
+                config::FileFormat::Toml,
+            ));
+        // Fall back on a *global* config
+        if let Some(path) = xargo_global_config_path() {
+            builder = builder.add_source(config::File::new(
+                path.as_os_str()
+                    .to_str()
+                    .expect("global config file has some kind of non-UTF-8 path"),
+                config::FileFormat::Toml,
+            ));
+        }
+        builder
+            .build()
+            .expect("failed to build config")
+            .try_deserialize()
+            .expect("config error!")
+    }
+}
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -82,8 +184,8 @@ enum OutputFormat {
 
 fn do_in_root<T, F: Fn(&ProjectToml) -> T>(f: F) -> T {
     let initial_path = std::env::current_dir().unwrap();
-    let config_builder = config::Config::builder()
-        .add_source(config::File::new("xargo.toml", config::FileFormat::Toml));
+    let config_builder =
+        config::Config::builder().add_source(config::File::new("", config::FileFormat::Toml));
     for ancestor in initial_path.ancestors() {
         std::env::set_current_dir(&ancestor).unwrap();
         match config_builder.build_cloned() {
@@ -128,34 +230,36 @@ impl InitSubcommand {
     }
 }
 
-/// Only call in project directory
-fn init_project(init_cmd: &InitSubcommand) -> std::io::Result<()> {
-    use std::io::Write;
-    // Prepare the project config file
-    let project_toml = init_cmd.project_toml();
-    let project_toml = toml::ser::to_vec(&project_toml).expect("failed to serialize toml file");
-    let mut toml = std::fs::File::create("xargo.toml")?;
-    toml.write_all(&project_toml)?;
-    // Prepare the source directory
-    std::fs::create_dir("src")?;
-    // Create the `main.tex` file
-    let mut main = std::fs::File::create("src/main.tex")?;
-    main.write_all(match init_cmd.system {
-        TexFormat::Tex => include_bytes!("files/main_tex.tex"),
-        TexFormat::Latex => include_bytes!("files/main_latex.tex"),
-    })?;
-    let mut gitignore = std::fs::File::create(".gitignore")?;
-    gitignore.write_all(include_bytes!("files/gitignore.txt"))?;
-    // Prepare the build directory
-    std::fs::create_dir("target")?;
-    Ok(())
+impl InitSubcommand {
+    /// Only call in project directory
+    fn execute(&self, _conf: &XargoConfig) -> std::io::Result<()> {
+        use std::io::Write;
+        // Prepare the project config file
+        let project_toml = self.project_toml();
+        let project_toml = toml::ser::to_vec(&project_toml).expect("failed to serialize toml file");
+        let mut toml = std::fs::File::create(PROJ_CONFIG_FILE)?;
+        toml.write_all(&project_toml)?;
+        // Prepare the source directory
+        std::fs::create_dir("src")?;
+        // Create the `main.tex` file
+        let mut main = std::fs::File::create("src/main.tex")?;
+        main.write_all(match self.system {
+            TexFormat::Tex => include_bytes!("files/main_tex.tex"),
+            TexFormat::Latex => include_bytes!("files/main_latex.tex"),
+        })?;
+        let mut gitignore = std::fs::File::create(".gitignore")?;
+        gitignore.write_all(include_bytes!("files/gitignore.txt"))?;
+        // Prepare the build directory
+        std::fs::create_dir("target")?;
+        Ok(())
+    }
 }
 
-fn new_project(init_cmd: &InitSubcommand) -> std::io::Result<()> {
+fn new_project(init_cmd: &InitSubcommand, conf: &XargoConfig) -> std::io::Result<()> {
     // Create the project directory
     std::fs::create_dir(&init_cmd.name)?;
     std::env::set_current_dir(&init_cmd.name)?;
-    init_project(init_cmd)
+    init_cmd.execute(conf)
 }
 
 fn build_command(conf: &ProjectToml) -> std::process::Command {
@@ -174,43 +278,6 @@ fn build_command(conf: &ProjectToml) -> std::process::Command {
     cmd.arg(&arg);
     cmd
 }
-
-// /// Recursively copy a directory, only copying the files that are newer in the source directory.
-// fn recursive_copy_update(
-//     mut from: std::path::PathBuf,
-//     mut to: std::path::PathBuf,
-// ) -> std::io::Result<()> {
-//     recursive_copy_update_inner(&mut from, &mut to)
-// }
-
-// fn recursive_copy_update_inner(
-//     from: &mut std::path::PathBuf,
-//     to: &mut std::path::PathBuf,
-// ) -> std::io::Result<()> {
-//     for dir_entry in std::fs::read_dir(&from)? {
-//         let dir_entry = dir_entry?;
-//         let from_metadata = dir_entry.metadata()?;
-//         let from_file_type = from_metadata.file_type();
-//         let name = dir_entry.file_name();
-//         from.push(&name);
-//         to.push(&name);
-//         match std::fs::metadata(&to) {
-//             Ok(_) => todo!(),
-//             Err(_) => todo!(),
-//         }
-//         let to_file_type = to_metadata.file_type();
-//         if from_file_type.is_symlink() {
-//             unimplemented!("No symlink handling yet");
-//         }
-//         if from_file_type.is_file() {
-//             if std::fs::try_exists(&to)? {}
-//         }
-//         if from_file_type.is_dir() {}
-//         from.pop();
-//         to.pop();
-//     }
-//     Ok(())
-// }
 
 /// Only call in project directory
 fn build_project(_build_cmd: &BuildSubcommand) -> impl Fn(&ProjectToml) -> std::io::Result<()> {
@@ -238,16 +305,19 @@ fn clean_project(_conf: &ProjectToml) -> std::io::Result<()> {
     Ok(())
 }
 
-fn execute(cmd: &Subcommand) -> std::io::Result<()> {
-    match cmd {
-        Subcommand::New(init_cmd) => new_project(&init_cmd),
-        Subcommand::Init(init_cmd) => init_project(&init_cmd),
-        Subcommand::Build(build_cmd) => do_in_root(build_project(build_cmd)),
-        Subcommand::Clean => do_in_root(clean_project),
+impl Subcommand {
+    fn execute(&self, conf: &XargoConfig) -> std::io::Result<()> {
+        match &self {
+            Subcommand::New(init_cmd) => new_project(&init_cmd, conf),
+            Subcommand::Init(init_cmd) => init_cmd.execute(conf),
+            Subcommand::Build(build_cmd) => do_in_root(build_project(build_cmd)),
+            Subcommand::Clean => do_in_root(clean_project),
+        }
     }
 }
 
 fn main() {
     let cli = Cli::parse();
-    execute(&cli.command).unwrap();
+    let conf = XargoConfig::new();
+    cli.command.execute(&conf).unwrap();
 }
