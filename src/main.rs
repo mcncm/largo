@@ -31,7 +31,7 @@ fn xargo_global_config_path() -> Option<PathBuf> {
     })
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 struct XargoConfig {
     tex_executable: Option<String>,
@@ -82,20 +82,24 @@ impl XargoConfig {
 
 impl XargoConfig {
     fn new() -> Self {
-        let mut builder = config::Config::builder()
-            // Use a *local* config as the primary source.
-            .add_source(config::File::new(
+        let mut builder = config::Config::builder();
+        // Use a *local* config as the primary source.
+        if std::path::Path::new(XARGO_CONFIG_DIR_FILE).exists() {
+            builder = builder.add_source(config::File::new(
                 XARGO_CONFIG_DIR_FILE,
                 config::FileFormat::Toml,
             ));
+        }
         // Fall back on a *global* config
         if let Some(path) = xargo_global_config_path() {
-            builder = builder.add_source(config::File::new(
-                path.as_os_str()
-                    .to_str()
-                    .expect("global config file has some kind of non-UTF-8 path"),
-                config::FileFormat::Toml,
-            ));
+            if path.exists() {
+                builder = builder.add_source(config::File::new(
+                    path.as_os_str()
+                        .to_str()
+                        .expect("global config file has some kind of non-UTF-8 path"),
+                    config::FileFormat::Toml,
+                ));
+            }
         }
         builder
             .build()
@@ -118,6 +122,8 @@ enum Subcommand {
     Init(InitSubcommand),
     Build(BuildSubcommand),
     Clean,
+    DebugXargo,
+    DebugProject,
 }
 
 #[derive(Parser)]
@@ -139,7 +145,7 @@ struct BuildSubcommand {
 }
 
 /// The document preparation systems that can be used by a package.
-#[derive(clap::ValueEnum, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, clap::ValueEnum)]
 #[serde(rename_all = "lowercase")]
 enum TexFormat {
     Tex,
@@ -147,7 +153,7 @@ enum TexFormat {
 }
 
 /// The document preparation systems that can be used by a package.
-#[derive(clap::ValueEnum, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, clap::ValueEnum)]
 #[serde(rename_all = "lowercase")]
 enum TexEngine {
     Tex,
@@ -156,33 +162,34 @@ enum TexEngine {
     Luatex,
 }
 
-#[derive(Deserialize, Serialize)]
-struct ProjectToml {
+#[derive(Debug, Deserialize, Serialize)]
+struct ProjectConfig {
     project: Project,
     profile: HashMap<String, Profile>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Project {
     name: String,
     system: TexFormat,
     engine: TexEngine,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 struct Profile {
     output_format: OutputFormat,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
 enum OutputFormat {
     Dvi,
     Ps,
     Pdf,
 }
 
-fn do_in_root<T, F: Fn(&ProjectToml) -> T>(f: F) -> T {
+fn do_in_root<T, F: Fn(&ProjectConfig) -> T>(f: F) -> T {
     let initial_path = std::env::current_dir().unwrap();
     let config_builder =
         config::Config::builder().add_source(config::File::new("", config::FileFormat::Toml));
@@ -205,7 +212,7 @@ fn do_in_root<T, F: Fn(&ProjectToml) -> T>(f: F) -> T {
 }
 
 impl InitSubcommand {
-    fn project_toml(&self) -> ProjectToml {
+    fn project_toml(&self) -> ProjectConfig {
         let mut default_profiles = HashMap::new();
         default_profiles.insert(
             "debug".to_string(),
@@ -219,7 +226,7 @@ impl InitSubcommand {
                 output_format: OutputFormat::Pdf,
             },
         );
-        ProjectToml {
+        ProjectConfig {
             project: Project {
                 name: self.name.clone(),
                 system: self.system,
@@ -262,7 +269,7 @@ fn new_project(init_cmd: &InitSubcommand, conf: &XargoConfig) -> std::io::Result
     init_cmd.execute(conf)
 }
 
-fn build_command(conf: &ProjectToml) -> std::process::Command {
+fn build_command(conf: &ProjectConfig) -> std::process::Command {
     let cmd = match (&conf.project.engine, &conf.project.system) {
         (TexEngine::Tex, TexFormat::Tex) => "tex",
         (TexEngine::Tex, TexFormat::Latex) => "latex",
@@ -280,8 +287,8 @@ fn build_command(conf: &ProjectToml) -> std::process::Command {
 }
 
 /// Only call in project directory
-fn build_project(_build_cmd: &BuildSubcommand) -> impl Fn(&ProjectToml) -> std::io::Result<()> {
-    |conf: &ProjectToml| {
+fn build_project(_build_cmd: &BuildSubcommand) -> impl Fn(&ProjectConfig) -> std::io::Result<()> {
+    |conf: &ProjectConfig| {
         // Copy the source directory to `target/src`
         std::process::Command::new("cp")
             .args(["-r", "src/", "target/build/"])
@@ -298,7 +305,7 @@ fn build_project(_build_cmd: &BuildSubcommand) -> impl Fn(&ProjectToml) -> std::
 }
 
 /// Only call in project directory
-fn clean_project(_conf: &ProjectToml) -> std::io::Result<()> {
+fn clean_project(_conf: &ProjectConfig) -> std::io::Result<()> {
     std::process::Command::new("rm")
         .args(["-rf", "target/*"])
         .output()?;
@@ -312,6 +319,11 @@ impl Subcommand {
             Subcommand::Init(init_cmd) => init_cmd.execute(conf),
             Subcommand::Build(build_cmd) => do_in_root(build_project(build_cmd)),
             Subcommand::Clean => do_in_root(clean_project),
+            Subcommand::DebugXargo => {
+                println!("{:?}", conf);
+                Ok(())
+            }
+            Subcommand::DebugProject => todo!(),
         }
     }
 }
