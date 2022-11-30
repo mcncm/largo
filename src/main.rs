@@ -83,16 +83,18 @@ impl XargoConfig {
 impl XargoConfig {
     fn new() -> Self {
         let mut builder = config::Config::builder();
-        // Use a *local* config as the primary source.
+        // FIXME: race condition!
         if std::path::Path::new(XARGO_CONFIG_DIR_FILE).exists() {
+            // Use a *local* config as the primary source.
             builder = builder.add_source(config::File::new(
                 XARGO_CONFIG_DIR_FILE,
                 config::FileFormat::Toml,
             ));
         }
-        // Fall back on a *global* config
         if let Some(path) = xargo_global_config_path() {
+            // FIXME: race condition!
             if path.exists() {
+                // Fall back on a *global* config
                 builder = builder.add_source(config::File::new(
                     path.as_os_str()
                         .to_str()
@@ -164,12 +166,12 @@ enum TexEngine {
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ProjectConfig {
-    project: Project,
+    project: ProjectConfigGeneral,
     profile: HashMap<String, Profile>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Project {
+struct ProjectConfigGeneral {
     name: String,
     system: TexFormat,
     engine: TexEngine,
@@ -189,26 +191,50 @@ enum OutputFormat {
     Pdf,
 }
 
-fn do_in_root<T, F: Fn(&ProjectConfig) -> T>(f: F) -> T {
-    let initial_path = std::env::current_dir().unwrap();
-    let config_builder =
-        config::Config::builder().add_source(config::File::new("", config::FileFormat::Toml));
-    for ancestor in initial_path.ancestors() {
-        std::env::set_current_dir(&ancestor).unwrap();
-        match config_builder.build_cloned() {
-            Ok(config) => {
-                let config = config
-                    .try_deserialize()
-                    .expect("failed to deserialize config");
-                return f(&config);
-            }
-            Err(e) => {
-                eprintln!("{}", e);
-                panic!("error building config");
-            }
+fn find_project_root() -> Option<PathBuf> {
+    let mut path = std::env::current_dir().unwrap();
+    loop {
+        path.push(PROJ_CONFIG_FILE);
+        if path.exists() {
+            path.pop();
+            return Some(path);
+        }
+        path.pop();
+        if !path.pop() {
+            break;
         }
     }
-    unreachable!();
+    None
+}
+
+#[derive(Debug)]
+struct Project {
+    root: PathBuf,
+    config: ProjectConfig,
+}
+
+impl Project {
+    fn find_enclosing() -> Option<Self> {
+        find_project_root().and_then(|mut path| {
+            path.push(PROJ_CONFIG_FILE);
+            let conf: ProjectConfig = config::Config::builder()
+                .add_source(config::File::new(
+                    path.as_os_str()
+                        .to_str()
+                        .expect("non-UTF-8 path or something"),
+                    config::FileFormat::Toml,
+                ))
+                .build()
+                .expect("failed to build project config")
+                .try_deserialize()
+                .expect("failed to deserialize project config");
+            path.pop();
+            Some(Self {
+                root: path,
+                config: conf,
+            })
+        })
+    }
 }
 
 impl InitSubcommand {
@@ -227,7 +253,7 @@ impl InitSubcommand {
             },
         );
         ProjectConfig {
-            project: Project {
+            project: ProjectConfigGeneral {
                 name: self.name.clone(),
                 system: self.system,
                 engine: self.engine,
@@ -269,47 +295,48 @@ fn new_project(init_cmd: &InitSubcommand, conf: &XargoConfig) -> std::io::Result
     init_cmd.execute(conf)
 }
 
-fn build_command(conf: &ProjectConfig) -> std::process::Command {
-    let cmd = match (&conf.project.engine, &conf.project.system) {
-        (TexEngine::Tex, TexFormat::Tex) => "tex",
-        (TexEngine::Tex, TexFormat::Latex) => "latex",
-        (TexEngine::Pdftex, TexFormat::Tex) => "pdftex",
-        (TexEngine::Pdftex, TexFormat::Latex) => "pdflatex",
-        (TexEngine::Xetex, TexFormat::Tex) => "xetex",
-        (TexEngine::Xetex, TexFormat::Latex) => "xelatex",
-        (TexEngine::Luatex, TexFormat::Tex) => "luatex",
-        (TexEngine::Luatex, TexFormat::Latex) => "lualatex",
-    };
-    let mut cmd = std::process::Command::new(cmd);
-    let arg = String::from(r#""\input{main.tex}""#);
-    cmd.arg(&arg);
-    cmd
-}
-
-/// Only call in project directory
-fn build_project(_build_cmd: &BuildSubcommand) -> impl Fn(&ProjectConfig) -> std::io::Result<()> {
-    |conf: &ProjectConfig| {
-        // Copy the source directory to `target/src`
-        std::process::Command::new("cp")
-            .args(["-r", "src/", "target/build/"])
-            .output()
-            .expect("failed to copy src dir");
-        // Build the project
-        let project_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir("target/build").unwrap();
-        build_command(&conf).output().expect("build command failed");
-        std::env::set_current_dir(&project_dir).unwrap();
-        std::fs::copy("target/build/main.pdf", "target/main.pdf").expect("failed to copy target");
-        Ok(())
+/// Check that a path is a directory that conforms with the layout of a xargo
+/// project.
+fn project_structure_conformant(path: &std::path::Path) -> bool {
+    // Ugh, lousy allocation.
+    let mut path = path.to_owned();
+    path.push(XARGO_CONFIG_FILE);
+    if !path.exists() {
+        return false;
     }
+    path.pop();
+    path.push("src");
+    if !path.exists() {
+        return false;
+    }
+    path.pop();
+    path.push("target");
+    if !path.exists() {
+        return false;
+    }
+    path.pop();
+    true
 }
 
-/// Only call in project directory
-fn clean_project(_conf: &ProjectConfig) -> std::io::Result<()> {
-    std::process::Command::new("rm")
-        .args(["-rf", "target/*"])
-        .output()?;
-    Ok(())
+impl BuildSubcommand {
+    fn to_command(&self, proj: &Project, conf: &XargoConfig) -> std::process::Command {
+        let program = match (&proj.config.project.engine, &proj.config.project.system) {
+            (TexEngine::Tex, TexFormat::Tex) => conf.tex_executable(),
+            (TexEngine::Tex, TexFormat::Latex) => conf.latex_executable(),
+            (TexEngine::Pdftex, TexFormat::Tex) => conf.pdftex_executable(),
+            (TexEngine::Pdftex, TexFormat::Latex) => conf.pdflatex_executable(),
+            (TexEngine::Xetex, TexFormat::Tex) => conf.xetex_executable(),
+            (TexEngine::Xetex, TexFormat::Latex) => conf.xelatex_executable(),
+            (TexEngine::Luatex, TexFormat::Tex) => conf.luatex_executable(),
+            (TexEngine::Luatex, TexFormat::Latex) => conf.lualatex_executable(),
+        };
+        let mut cmd = std::process::Command::new(program);
+        cmd.current_dir(&proj.root);
+        cmd.args(["-output-directory", "target"]);
+        let arg = String::from(r#""\input{main.tex}""#);
+        cmd.arg(&arg);
+        cmd
+    }
 }
 
 impl Subcommand {
@@ -317,8 +344,22 @@ impl Subcommand {
         match &self {
             Subcommand::New(init_cmd) => new_project(&init_cmd, conf),
             Subcommand::Init(init_cmd) => init_cmd.execute(conf),
-            Subcommand::Build(build_cmd) => do_in_root(build_project(build_cmd)),
-            Subcommand::Clean => do_in_root(clean_project),
+            Subcommand::Build(build_cmd) => {
+                let project = Project::find_enclosing().expect("no enclosing project");
+                build_cmd
+                    .to_command(&project, conf)
+                    .output()
+                    .expect("failed to copy src dir");
+                Ok(())
+            }
+            Subcommand::Clean => {
+                let mut path = find_project_root().expect("no enclosing project");
+                assert!(project_structure_conformant(&path));
+                path.push("target");
+                std::fs::remove_dir_all(&path).expect("failed to unlink target directory");
+                std::fs::create_dir(&path).expect("failed to create new target directory");
+                Ok(())
+            }
             Subcommand::DebugXargo => {
                 println!("{:?}", conf);
                 Ok(())
