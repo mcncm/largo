@@ -42,47 +42,16 @@ struct XargoConfig {
     xelatex_executable: Option<String>,
     luatex_executable: Option<String>,
     lualatex_executable: Option<String>,
-}
 
-#[allow(dead_code)]
-// All the executable functions that you will probably want to generate with a macro
-impl XargoConfig {
-    fn tex_executable(&self) -> &str {
-        self.tex_executable.as_deref().unwrap_or("tex")
-    }
-
-    fn latex_executable(&self) -> &str {
-        self.latex_executable.as_deref().unwrap_or("latex")
-    }
-
-    fn pdftex_executable(&self) -> &str {
-        self.pdftex_executable.as_deref().unwrap_or("pdftex")
-    }
-
-    fn pdflatex_executable(&self) -> &str {
-        self.pdflatex_executable.as_deref().unwrap_or("pdflatex")
-    }
-
-    fn xetex_executable(&self) -> &str {
-        self.xetex_executable.as_deref().unwrap_or("xetex")
-    }
-
-    fn xelatex_executable(&self) -> &str {
-        self.xelatex_executable.as_deref().unwrap_or("xelatex")
-    }
-
-    fn luatex_executable(&self) -> &str {
-        self.luatex_executable.as_deref().unwrap_or("luatex")
-    }
-
-    fn lualatex_executable(&self) -> &str {
-        self.lualatex_executable.as_deref().unwrap_or("lualatex")
-    }
+    /// The default profile selected if no other profile is chosen.
+    default_profile: String,
 }
 
 impl XargoConfig {
     fn new() -> Self {
-        let mut builder = config::Config::builder();
+        let mut builder = config::Config::builder()
+            .set_default("default-profile", "debug")
+            .unwrap();
         // FIXME: race condition!
         if std::path::Path::new(XARGO_CONFIG_DIR_FILE).exists() {
             // Use a *local* config as the primary source.
@@ -108,6 +77,33 @@ impl XargoConfig {
             .expect("failed to build config")
             .try_deserialize()
             .expect("config error!")
+    }
+
+    fn choose_program(&self, engine: TexEngine, format: TexFormat) -> &str {
+        match (engine, format) {
+            (TexEngine::Tex, TexFormat::Tex) => self.tex_executable.as_deref().unwrap_or("tex"),
+            (TexEngine::Tex, TexFormat::Latex) => {
+                self.latex_executable.as_deref().unwrap_or("latex")
+            }
+            (TexEngine::Pdftex, TexFormat::Tex) => {
+                self.pdftex_executable.as_deref().unwrap_or("pdftex")
+            }
+            (TexEngine::Pdftex, TexFormat::Latex) => {
+                self.pdflatex_executable.as_deref().unwrap_or("pdflatex")
+            }
+            (TexEngine::Xetex, TexFormat::Tex) => {
+                self.xetex_executable.as_deref().unwrap_or("xetex")
+            }
+            (TexEngine::Xetex, TexFormat::Latex) => {
+                self.xelatex_executable.as_deref().unwrap_or("xelatex")
+            }
+            (TexEngine::Luatex, TexFormat::Tex) => {
+                self.luatex_executable.as_deref().unwrap_or("luatex")
+            }
+            (TexEngine::Luatex, TexFormat::Latex) => {
+                self.lualatex_executable.as_deref().unwrap_or("lualatex")
+            }
+        }
     }
 }
 
@@ -300,7 +296,7 @@ fn new_project(init_cmd: &InitSubcommand, conf: &XargoConfig) -> std::io::Result
 fn project_structure_conformant(path: &std::path::Path) -> bool {
     // Ugh, lousy allocation.
     let mut path = path.to_owned();
-    path.push(XARGO_CONFIG_FILE);
+    path.push(PROJ_CONFIG_FILE);
     if !path.exists() {
         return false;
     }
@@ -319,22 +315,30 @@ fn project_structure_conformant(path: &std::path::Path) -> bool {
 }
 
 impl BuildSubcommand {
+    fn choose_profile<'a>(
+        &'a self,
+        proj: &'a ProjectConfig,
+        conf: &'a XargoConfig,
+    ) -> (&'a str, &'a Profile) {
+        let prof_name = self.profile.as_deref().unwrap_or(&conf.default_profile);
+        let profile = proj.profile.get(prof_name).expect("Profile not found");
+        (prof_name, profile)
+    }
+
+    fn tex_input(&self, prof_name: &str) -> String {
+        format!(
+            concat!(r#"\def\XPROFILE{{{}}}"#, r#"\input{{src/main.tex}}"#),
+            prof_name
+        )
+    }
+
     fn to_command(&self, proj: &Project, conf: &XargoConfig) -> std::process::Command {
-        let program = match (&proj.config.project.engine, &proj.config.project.system) {
-            (TexEngine::Tex, TexFormat::Tex) => conf.tex_executable(),
-            (TexEngine::Tex, TexFormat::Latex) => conf.latex_executable(),
-            (TexEngine::Pdftex, TexFormat::Tex) => conf.pdftex_executable(),
-            (TexEngine::Pdftex, TexFormat::Latex) => conf.pdflatex_executable(),
-            (TexEngine::Xetex, TexFormat::Tex) => conf.xetex_executable(),
-            (TexEngine::Xetex, TexFormat::Latex) => conf.xelatex_executable(),
-            (TexEngine::Luatex, TexFormat::Tex) => conf.luatex_executable(),
-            (TexEngine::Luatex, TexFormat::Latex) => conf.lualatex_executable(),
-        };
+        let (prof_name, _profile) = self.choose_profile(&proj.config, conf);
+        let program = conf.choose_program(proj.config.project.engine, proj.config.project.system);
         let mut cmd = std::process::Command::new(program);
         cmd.current_dir(&proj.root);
         cmd.args(["-output-directory", "target"]);
-        let arg = String::from(r#""\input{main.tex}""#);
-        cmd.arg(&arg);
+        cmd.arg(&self.tex_input(&prof_name));
         cmd
     }
 }
