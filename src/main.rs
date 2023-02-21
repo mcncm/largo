@@ -1,5 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
@@ -48,7 +49,7 @@ struct XargoConfig {
 }
 
 impl XargoConfig {
-    fn new() -> Self {
+    fn new() -> Result<Self> {
         let mut builder = config::Config::builder()
             .set_default("default-profile", "debug")
             .unwrap();
@@ -72,11 +73,7 @@ impl XargoConfig {
                 ));
             }
         }
-        builder
-            .build()
-            .expect("failed to build config")
-            .try_deserialize()
-            .expect("config error!")
+        Ok(builder.build()?.try_deserialize()?)
     }
 
     fn choose_program(&self, engine: TexEngine, format: TexFormat) -> &str {
@@ -164,6 +161,7 @@ enum TexEngine {
 struct ProjectConfig {
     project: ProjectConfigGeneral,
     profile: HashMap<String, Profile>,
+    dependencies: HashMap<String, Dependency>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -187,20 +185,30 @@ enum OutputFormat {
     Pdf,
 }
 
-fn find_project_root() -> Option<PathBuf> {
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum Dependency {
+    Path { path: String },
+}
+
+fn find_project_root() -> Result<PathBuf> {
     let mut path = std::env::current_dir().unwrap();
+    let path_cpy = path.clone();
     loop {
         path.push(PROJ_CONFIG_FILE);
         if path.exists() {
             path.pop();
-            return Some(path);
+            return Ok(path);
         }
         path.pop();
         if !path.pop() {
             break;
         }
     }
-    None
+    Err(anyhow!(
+        "failed to find project containing `{}`",
+        path_cpy.display()
+    ))
 }
 
 #[derive(Debug)]
@@ -210,25 +218,22 @@ struct Project {
 }
 
 impl Project {
-    fn find_enclosing() -> Option<Self> {
-        find_project_root().and_then(|mut path| {
-            path.push(PROJ_CONFIG_FILE);
-            let conf: ProjectConfig = config::Config::builder()
-                .add_source(config::File::new(
-                    path.as_os_str()
-                        .to_str()
-                        .expect("non-UTF-8 path or something"),
-                    config::FileFormat::Toml,
-                ))
-                .build()
-                .expect("failed to build project config")
-                .try_deserialize()
-                .expect("failed to deserialize project config");
-            path.pop();
-            Some(Self {
-                root: path,
-                config: conf,
-            })
+    fn find_enclosing() -> Result<Self> {
+        let mut path = find_project_root()?;
+        path.push(PROJ_CONFIG_FILE);
+        let conf: ProjectConfig = config::Config::builder()
+            .add_source(config::File::new(
+                path.as_os_str()
+                    .to_str()
+                    .expect("non-UTF-8 path or something"),
+                config::FileFormat::Toml,
+            ))
+            .build()?
+            .try_deserialize()?;
+        path.pop();
+        Ok(Self {
+            root: path,
+            config: conf,
         })
     }
 }
@@ -255,17 +260,18 @@ impl InitSubcommand {
                 engine: self.engine,
             },
             profile: default_profiles,
+            dependencies: HashMap::new(),
         }
     }
 }
 
 impl InitSubcommand {
     /// Only call in project directory
-    fn execute(&self, _conf: &XargoConfig) -> std::io::Result<()> {
+    fn execute(&self, _conf: &XargoConfig) -> Result<()> {
         use std::io::Write;
         // Prepare the project config file
         let project_toml = self.project_toml();
-        let project_toml = toml::ser::to_vec(&project_toml).expect("failed to serialize toml file");
+        let project_toml = toml::ser::to_vec(&project_toml)?;
         let mut toml = std::fs::File::create(PROJ_CONFIG_FILE)?;
         toml.write_all(&project_toml)?;
         // Prepare the source directory
@@ -284,7 +290,7 @@ impl InitSubcommand {
     }
 }
 
-fn new_project(init_cmd: &InitSubcommand, conf: &XargoConfig) -> std::io::Result<()> {
+fn new_project(init_cmd: &InitSubcommand, conf: &XargoConfig) -> Result<()> {
     // Create the project directory
     std::fs::create_dir(&init_cmd.name)?;
     std::env::set_current_dir(&init_cmd.name)?;
@@ -319,10 +325,13 @@ impl BuildSubcommand {
         &'a self,
         proj: &'a ProjectConfig,
         conf: &'a XargoConfig,
-    ) -> (&'a str, &'a Profile) {
+    ) -> Result<(&'a str, &'a Profile)> {
         let prof_name = self.profile.as_deref().unwrap_or(&conf.default_profile);
-        let profile = proj.profile.get(prof_name).expect("Profile not found");
-        (prof_name, profile)
+        let profile = proj
+            .profile
+            .get(prof_name)
+            .ok_or_else(|| anyhow!("no profile found"))?;
+        Ok((prof_name, profile))
     }
 
     fn tex_input(&self, prof_name: &str) -> String {
@@ -332,36 +341,56 @@ impl BuildSubcommand {
         )
     }
 
-    fn to_command(&self, proj: &Project, conf: &XargoConfig) -> std::process::Command {
-        let (prof_name, _profile) = self.choose_profile(&proj.config, conf);
+    fn envvars(&self, proj: &ProjectConfig) -> HashMap<&'static str, String> {
+        let mut vars = HashMap::new();
+
+        let mut tex_inputs = String::new();
+        for (_dep_name, dep_body) in &proj.dependencies {
+            match &dep_body {
+                Dependency::Path { path } => {
+                    tex_inputs += &path;
+                    tex_inputs.push(':');
+                }
+            }
+        }
+        if !tex_inputs.is_empty() {
+            vars.insert("TEXINPUTS", tex_inputs);
+        }
+
+        vars
+    }
+
+    fn to_command(&self, proj: &Project, conf: &XargoConfig) -> Result<std::process::Command> {
+        let (prof_name, _profile) = self.choose_profile(&proj.config, conf)?;
         let program = conf.choose_program(proj.config.project.engine, proj.config.project.system);
+        let envvars = self.envvars(&proj.config);
         let mut cmd = std::process::Command::new(program);
+        for (var, val) in &envvars {
+            cmd.env(var, val);
+        }
         cmd.current_dir(&proj.root);
         cmd.args(["-output-directory", "target"]);
         cmd.arg(&self.tex_input(&prof_name));
-        cmd
+        Ok(cmd)
     }
 }
 
 impl Subcommand {
-    fn execute(&self, conf: &XargoConfig) -> std::io::Result<()> {
+    fn execute(&self, conf: &XargoConfig) -> Result<()> {
         match &self {
-            Subcommand::New(init_cmd) => new_project(&init_cmd, conf),
-            Subcommand::Init(init_cmd) => init_cmd.execute(conf),
+            Subcommand::New(init_cmd) => Ok(new_project(&init_cmd, conf)?),
+            Subcommand::Init(init_cmd) => Ok(init_cmd.execute(conf)?),
             Subcommand::Build(build_cmd) => {
-                let project = Project::find_enclosing().expect("no enclosing project");
-                build_cmd
-                    .to_command(&project, conf)
-                    .output()
-                    .expect("failed to copy src dir");
+                let project = Project::find_enclosing()?;
+                build_cmd.to_command(&project, conf)?.output()?;
                 Ok(())
             }
             Subcommand::Clean => {
-                let mut path = find_project_root().expect("no enclosing project");
+                let mut path = find_project_root()?;
                 assert!(project_structure_conformant(&path));
                 path.push("target");
-                std::fs::remove_dir_all(&path).expect("failed to unlink target directory");
-                std::fs::create_dir(&path).expect("failed to create new target directory");
+                std::fs::remove_dir_all(&path)?;
+                std::fs::create_dir(&path)?;
                 Ok(())
             }
             Subcommand::DebugXargo => {
@@ -373,8 +402,8 @@ impl Subcommand {
     }
 }
 
-fn main() {
+fn main() -> Result<()> {
     let cli = Cli::parse();
-    let conf = XargoConfig::new();
-    cli.command.execute(&conf).unwrap();
+    let conf = XargoConfig::new()?;
+    cli.command.execute(&conf)
 }
