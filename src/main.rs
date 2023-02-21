@@ -4,7 +4,6 @@ use anyhow::{anyhow, Result};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-const PROJ_CONFIG_FILE: &'static str = "xargo.toml";
 const XARGO_CONFIG_DIR: &'static str = ".xargo";
 const XARGO_CONFIG_FILE: &'static str = "config.toml";
 const XARGO_CONFIG_DIR_FILE: &'static str = ".xargo/config.toml";
@@ -191,48 +190,69 @@ enum Dependency {
     Path { path: String },
 }
 
-fn find_project_root() -> Result<PathBuf> {
-    let mut path = std::env::current_dir().unwrap();
-    let path_cpy = path.clone();
-    loop {
-        path.push(PROJ_CONFIG_FILE);
-        if path.exists() {
-            path.pop();
-            return Ok(path);
-        }
-        path.pop();
-        if !path.pop() {
-            break;
+mod projdir {
+    use anyhow::{anyhow, Result};
+
+    pub const SRC_DIR: &'static str = "src";
+    pub const BUILD_DIR: &'static str = "build";
+    pub const CONFIG_FILE: &'static str = "xargo.toml";
+    pub const LOCK_FILE: &'static str = "Xargo.lock";
+
+    typedir::typedir! {
+        node RootDir {
+            CONFIG_FILE => node ConfigFile;
+            LOCK_FILE => node LockFile;
+            SRC_DIR => node SrcDir;
+            BUILD_DIR => node BuildDir;
+        };
+    }
+
+    impl RootDir {
+        pub fn find() -> Result<Self> {
+            let mut path = std::env::current_dir().unwrap();
+            let path_cpy = path.clone();
+            loop {
+                path.push(CONFIG_FILE);
+                if path.exists() {
+                    path.pop();
+                    return Ok(RootDir(path));
+                }
+                path.pop();
+                if !path.pop() {
+                    break;
+                }
+            }
+            Err(anyhow!(
+                "failed to find project containing `{}`",
+                path_cpy.display()
+            ))
         }
     }
-    Err(anyhow!(
-        "failed to find project containing `{}`",
-        path_cpy.display()
-    ))
 }
 
 #[derive(Debug)]
 struct Project {
-    root: PathBuf,
+    root: projdir::RootDir,
     config: ProjectConfig,
 }
 
 impl Project {
     fn find_enclosing() -> Result<Self> {
-        let mut path = find_project_root()?;
-        path.push(PROJ_CONFIG_FILE);
+        use typedir::SubDir;
+        let root = projdir::RootDir::find()?;
+        let path = projdir::ConfigFile::from(root);
         let conf: ProjectConfig = config::Config::builder()
             .add_source(config::File::new(
-                path.as_os_str()
+                path.as_ref()
+                    .as_os_str()
                     .to_str()
                     .expect("non-UTF-8 path or something"),
                 config::FileFormat::Toml,
             ))
             .build()?
             .try_deserialize()?;
-        path.pop();
         Ok(Self {
-            root: path,
+            root: path.parent(),
             config: conf,
         })
     }
@@ -272,10 +292,10 @@ impl InitSubcommand {
         // Prepare the project config file
         let project_toml = self.project_toml();
         let project_toml = toml::ser::to_vec(&project_toml)?;
-        let mut toml = std::fs::File::create(PROJ_CONFIG_FILE)?;
+        let mut toml = std::fs::File::create(projdir::CONFIG_FILE)?;
         toml.write_all(&project_toml)?;
         // Prepare the source directory
-        std::fs::create_dir("src")?;
+        std::fs::create_dir(projdir::SRC_DIR)?;
         // Create the `main.tex` file
         let mut main = std::fs::File::create("src/main.tex")?;
         main.write_all(match self.system {
@@ -285,7 +305,7 @@ impl InitSubcommand {
         let mut gitignore = std::fs::File::create(".gitignore")?;
         gitignore.write_all(include_bytes!("files/gitignore.txt"))?;
         // Prepare the build directory
-        std::fs::create_dir("target")?;
+        std::fs::create_dir(projdir::BUILD_DIR)?;
         Ok(())
     }
 }
@@ -302,7 +322,7 @@ fn new_project(init_cmd: &InitSubcommand, conf: &XargoConfig) -> Result<()> {
 fn project_structure_conformant(path: &std::path::Path) -> bool {
     // Ugh, lousy allocation.
     let mut path = path.to_owned();
-    path.push(PROJ_CONFIG_FILE);
+    path.push(projdir::CONFIG_FILE);
     if !path.exists() {
         return false;
     }
@@ -369,7 +389,7 @@ impl BuildSubcommand {
             cmd.env(var, val);
         }
         cmd.current_dir(&proj.root);
-        cmd.args(["-output-directory", "target"]);
+        cmd.args(["-output-directory", projdir::BUILD_DIR]);
         cmd.arg(&self.tex_input(&prof_name));
         Ok(cmd)
     }
@@ -386,11 +406,11 @@ impl Subcommand {
                 Ok(())
             }
             Subcommand::Clean => {
-                let mut path = find_project_root()?;
-                assert!(project_structure_conformant(&path));
-                path.push("target");
-                std::fs::remove_dir_all(&path)?;
-                std::fs::create_dir(&path)?;
+                let root = projdir::RootDir::find()?;
+                assert!(project_structure_conformant(root.as_ref()));
+                let build_dir = projdir::BuildDir::from(root);
+                std::fs::remove_dir_all(&build_dir.as_ref())?;
+                std::fs::create_dir(&build_dir.as_ref())?;
                 Ok(())
             }
             Subcommand::DebugXargo => {
