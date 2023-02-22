@@ -2,24 +2,12 @@
 
 pub trait Node: AsRef<std::path::Path> + Sized {}
 
-pub trait SubDir: From<Self::Parent> {
+pub trait SubDir: Node + From<Self::Parent> {
     type Parent: Node;
     type Link: AsRef<std::path::Path>;
 
     fn parent(self) -> Self::Parent;
 }
-
-pub struct Ref<'a, T>
-where
-    T: Node,
-{
-    _node: &'a T,
-}
-
-// macro_rules! typedir_ctx {
-//     (sup $Parent:ident in $)
-//     (node $Parent:ident / $link:expr => $sub:ident)
-// }
 
 // An internal helper macro for assembling subdirectories in a context
 // of their parent

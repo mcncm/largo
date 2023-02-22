@@ -7,16 +7,31 @@ use crate::dirs;
 use crate::tex::*;
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct Executable(String);
+
+impl AsRef<str> for Executable {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<std::ffi::OsStr> for Executable {
+    fn as_ref(&self) -> &std::ffi::OsStr {
+        &self.0.as_ref()
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct XargoConfig {
-    tex_executable: String,
-    latex_executable: String,
-    pdftex_executable: String,
-    pdflatex_executable: String,
-    xetex_executable: String,
-    xelatex_executable: String,
-    luatex_executable: String,
-    lualatex_executable: String,
+    tex_executable: Executable,
+    latex_executable: Executable,
+    pdftex_executable: Executable,
+    pdflatex_executable: Executable,
+    xetex_executable: Executable,
+    xelatex_executable: Executable,
+    luatex_executable: Executable,
+    lualatex_executable: Executable,
 
     /// The default profile selected if no other profile is chosen.
     default_profile: String,
@@ -52,7 +67,7 @@ impl XargoConfig {
         Ok(builder.build()?.try_deserialize()?)
     }
 
-    pub fn choose_program(&self, engine: TexEngine, format: TexFormat) -> &str {
+    pub fn choose_program(&self, engine: TexEngine, format: TexFormat) -> &Executable {
         match (engine, format) {
             (TexEngine::Tex, TexFormat::Tex) => &self.tex_executable,
             (TexEngine::Tex, TexFormat::Latex) => &self.latex_executable,

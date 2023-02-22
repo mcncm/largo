@@ -2,15 +2,18 @@ pub mod proj {
     use anyhow::{anyhow, Result};
 
     pub const SRC_DIR: &'static str = "src";
+    pub const MAIN_FILE: &'static str = "main.tex";
     pub const BUILD_DIR: &'static str = "build";
     pub const CONFIG_FILE: &'static str = "xargo.toml";
     pub const LOCK_FILE: &'static str = "Xargo.lock";
+    pub const GITIGNORE: &'static str = ".gitignore";
 
     typedir::typedir! {
         node RootDir {
             CONFIG_FILE => node ConfigFile;
             LOCK_FILE => node LockFile;
             SRC_DIR => node SrcDir;
+            MAIN_FILE => node MainFile;
             BUILD_DIR => node BuildDir;
         };
     }

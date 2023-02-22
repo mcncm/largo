@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::Parser;
 
 use xargo::{conf::XargoConfig, dirs, project, tex::*};
@@ -61,7 +61,7 @@ impl InitSubcommand {
         project::ProjectConfig {
             project: project::ProjectConfigGeneral {
                 name: self.name.clone(),
-                system: self.system,
+                format: self.system,
                 engine: self.engine,
             },
             profile: default_profiles,
@@ -102,65 +102,6 @@ fn new_project(init_cmd: &InitSubcommand, conf: &XargoConfig) -> Result<()> {
     init_cmd.execute(conf)
 }
 
-impl BuildSubcommand {
-    fn choose_profile<'a>(
-        &'a self,
-        proj: &'a project::ProjectConfig,
-        conf: &'a XargoConfig,
-    ) -> Result<(&'a str, &'a project::Profile)> {
-        let prof_name = self.profile.as_deref().unwrap_or(conf.default_profile());
-        let profile = proj
-            .profile
-            .get(prof_name)
-            .ok_or_else(|| anyhow!("no profile found"))?;
-        Ok((prof_name, profile))
-    }
-
-    fn tex_input(&self, prof_name: &str) -> String {
-        format!(
-            concat!(r#"\def\XPROFILE{{{}}}"#, r#"\input{{src/main.tex}}"#),
-            prof_name
-        )
-    }
-
-    fn envvars(&self, proj: &project::ProjectConfig) -> HashMap<&'static str, String> {
-        let mut vars = HashMap::new();
-
-        let mut tex_inputs = String::new();
-        for (_dep_name, dep_body) in &proj.dependencies {
-            match &dep_body {
-                project::Dependency::Path { path } => {
-                    tex_inputs += &path;
-                    tex_inputs.push(':');
-                }
-            }
-        }
-        if !tex_inputs.is_empty() {
-            vars.insert("TEXINPUTS", tex_inputs);
-        }
-
-        vars
-    }
-
-    fn to_command(
-        &self,
-        proj: &project::Project,
-        conf: &XargoConfig,
-    ) -> Result<std::process::Command> {
-        let (prof_name, _profile) = self.choose_profile(&proj.config, conf)?;
-        let program = conf.choose_program(proj.config.project.engine, proj.config.project.system);
-        let envvars = self.envvars(&proj.config);
-        let mut cmd = std::process::Command::new(program);
-        for (var, val) in &envvars {
-            cmd.env(var, val);
-        }
-        cmd.current_dir(&proj.root);
-        cmd.args(["-output-directory", dirs::proj::BUILD_DIR]);
-        cmd.arg(&self.tex_input(&prof_name));
-        Ok(cmd)
-    }
-}
-
 impl Subcommand {
     fn execute(&self, conf: &XargoConfig) -> Result<()> {
         match &self {
@@ -168,7 +109,9 @@ impl Subcommand {
             Subcommand::Init(init_cmd) => Ok(init_cmd.execute(conf)?),
             Subcommand::Build(build_cmd) => {
                 let project = project::Project::find()?;
-                build_cmd.to_command(&project, conf)?.output()?;
+                let build_cmd = xargo::building::BuildCmd::new(&build_cmd.profile, &project, conf)?;
+                let mut shell_cmd: std::process::Command = build_cmd.into();
+                shell_cmd.output()?;
                 Ok(())
             }
             Subcommand::Clean => {
