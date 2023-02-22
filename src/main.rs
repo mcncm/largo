@@ -4,71 +4,7 @@ use anyhow::{anyhow, Result};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use xargo::dirs;
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-struct XargoConfig {
-    tex_executable: Option<String>,
-    latex_executable: Option<String>,
-    pdftex_executable: Option<String>,
-    pdflatex_executable: Option<String>,
-    xetex_executable: Option<String>,
-    xelatex_executable: Option<String>,
-    luatex_executable: Option<String>,
-    lualatex_executable: Option<String>,
-
-    /// The default profile selected if no other profile is chosen.
-    default_profile: String,
-}
-
-impl XargoConfig {
-    fn new() -> Result<Self> {
-        let mut builder = config::Config::builder()
-            .set_default("default-profile", "debug")
-            .unwrap();
-
-        // TODO: project-local config override
-        // // FIXME: race condition!
-        // if dirs::conf.as_ref().exists() {
-        //     // Use a *local* config as the primary source.
-        //     builder = builder.add_source(dirs::conf::ConfigFileSource::try_from(&config_file)?);
-        // }
-
-        let config_dir = dirs::conf::ConfigDir::global_config()?;
-        let config_file = dirs::conf::ConfigFile::from(config_dir);
-        // Fall back on a *global* config
-        builder = builder.add_source(dirs::conf::ConfigFileSource::try_from(&config_file)?);
-        Ok(builder.build()?.try_deserialize()?)
-    }
-
-    fn choose_program(&self, engine: TexEngine, format: TexFormat) -> &str {
-        match (engine, format) {
-            (TexEngine::Tex, TexFormat::Tex) => self.tex_executable.as_deref().unwrap_or("tex"),
-            (TexEngine::Tex, TexFormat::Latex) => {
-                self.latex_executable.as_deref().unwrap_or("latex")
-            }
-            (TexEngine::Pdftex, TexFormat::Tex) => {
-                self.pdftex_executable.as_deref().unwrap_or("pdftex")
-            }
-            (TexEngine::Pdftex, TexFormat::Latex) => {
-                self.pdflatex_executable.as_deref().unwrap_or("pdflatex")
-            }
-            (TexEngine::Xetex, TexFormat::Tex) => {
-                self.xetex_executable.as_deref().unwrap_or("xetex")
-            }
-            (TexEngine::Xetex, TexFormat::Latex) => {
-                self.xelatex_executable.as_deref().unwrap_or("xelatex")
-            }
-            (TexEngine::Luatex, TexFormat::Tex) => {
-                self.luatex_executable.as_deref().unwrap_or("luatex")
-            }
-            (TexEngine::Luatex, TexFormat::Latex) => {
-                self.lualatex_executable.as_deref().unwrap_or("lualatex")
-            }
-        }
-    }
-}
+use xargo::{conf::XargoConfig, dirs, tex::*};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -106,24 +42,6 @@ struct BuildSubcommand {
     profile: Option<String>,
 }
 
-/// The document preparation systems that can be used by a package.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, clap::ValueEnum)]
-#[serde(rename_all = "lowercase")]
-enum TexFormat {
-    Tex,
-    Latex,
-}
-
-/// The document preparation systems that can be used by a package.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, clap::ValueEnum)]
-#[serde(rename_all = "lowercase")]
-enum TexEngine {
-    Tex,
-    Pdftex,
-    Xetex,
-    Luatex,
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 struct ProjectConfig {
     project: ProjectConfigGeneral,
@@ -142,14 +60,6 @@ struct ProjectConfigGeneral {
 #[serde(rename_all = "kebab-case")]
 struct Profile {
     output_format: OutputFormat,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
-enum OutputFormat {
-    Dvi,
-    Ps,
-    Pdf,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -274,7 +184,7 @@ impl BuildSubcommand {
         proj: &'a ProjectConfig,
         conf: &'a XargoConfig,
     ) -> Result<(&'a str, &'a Profile)> {
-        let prof_name = self.profile.as_deref().unwrap_or(&conf.default_profile);
+        let prof_name = self.profile.as_deref().unwrap_or(conf.default_profile());
         let profile = proj
             .profile
             .get(prof_name)
