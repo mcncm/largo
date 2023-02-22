@@ -12,10 +12,50 @@ pub mod proj {
         node RootDir {
             CONFIG_FILE => node ConfigFile;
             LOCK_FILE => node LockFile;
-            SRC_DIR => node SrcDir;
-            MAIN_FILE => node MainFile;
+            SRC_DIR => node SrcDir {
+                MAIN_FILE => node MainFile;
+            };
             BUILD_DIR => node BuildDir;
+            GITIGNORE => node Gitignore;
         };
+    }
+
+    /// Initialize a xargo project directory at the passed root
+    pub fn init(root: std::path::PathBuf, new_proj: NewProject) -> Result<()> {
+        // NOTE: This is *extremely* verbose without some kind of "pop-on-drop"
+        // list structure. Unfortunately, that seems to be tricky to mix with
+        // lots of newtypes and generics and macros.
+        use typedir::SubDir;
+        let root = RootDir(root);
+        // Project config file
+
+        let proj_conf = ConfigFile::from(root);
+        proj_conf.try_create(&new_proj.project_config)?;
+        let root = proj_conf.parent();
+        // Gitignore
+        let gitignore = Gitignore::from(root);
+        try_create(
+            &gitignore,
+            ToCreate::File(include_bytes!("files/gitignore.txt")),
+        )?;
+        let root = gitignore.parent();
+        // Source
+        let src_dir = SrcDir::from(root);
+        try_create(&src_dir, ToCreate::Dir)?;
+        let main_file = MainFile::from(src_dir);
+        try_create(
+            &main_file,
+            ToCreate::File(include_bytes!("files/main_latex.tex")),
+        )?;
+        let root = main_file.parent().parent();
+        // Build directory
+        let build_dir = BuildDir::from(root);
+        try_create(&build_dir, ToCreate::Dir)?;
+        Ok(())
+    }
+
+    pub struct NewProject<'a> {
+        pub project_config: &'a crate::project::ProjectConfig,
     }
 
     impl RootDir {
@@ -38,6 +78,37 @@ pub mod proj {
                 path_cpy.display()
             ))
         }
+    }
+
+    impl ConfigFile {
+        fn try_create(&self, project_config: &crate::project::ProjectConfig) -> Result<()> {
+            try_create(self, ToCreate::File(&toml::ser::to_vec(&project_config)?))
+        }
+    }
+
+    // What to create
+    enum ToCreate<'a> {
+        Dir,
+        File(&'a [u8]),
+    }
+
+    fn try_create<N: typedir::Node>(node: &N, to_create: ToCreate) -> Result<()> {
+        use std::io::Write;
+        match to_create {
+            ToCreate::Dir => std::fs::create_dir(node.as_ref())?,
+            ToCreate::File(contents) => {
+                // FIXME race condition! TOC/TOU! Not good!
+                if node.as_ref().exists() {
+                    return Err(anyhow!(
+                        "file already exists: `{}`",
+                        node.as_ref().display()
+                    ));
+                }
+                let mut f = std::fs::File::create(node.as_ref())?;
+                f.write_all(contents)?;
+            }
+        }
+        Ok(())
     }
 }
 

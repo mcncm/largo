@@ -70,7 +70,7 @@ impl<'a> BuildCmd<'a> {
             .get(prof_name)
             .ok_or_else(|| anyhow!("profile `{}` found", prof_name))?;
 
-        let (engine, format) = (proj.config.project.format, proj.config.project.engine);
+        let (engine, format) = (proj.config.project.system, proj.config.project.engine);
         Ok(Self {
             build_root: &proj.root,
             build_vars: BuildVars::from(&proj.config),

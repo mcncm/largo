@@ -21,7 +21,7 @@ pub struct ProjectConfig {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProjectConfigGeneral {
     pub name: String,
-    pub format: tex::TexFormat,
+    pub system: tex::TexFormat,
     pub engine: tex::TexEngine,
 }
 

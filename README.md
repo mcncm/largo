@@ -15,8 +15,9 @@ Xargo tries to do the following things:
 + Backwards-compatibility via `xargo eject` subcommand that produces a standalone, reproducible, `xargo`-free TeX project.
   - Writes new bibliography file from global bibliography
   - Vendors packages
-+ Replace certain packages with an opinionated alternative. These include,
++ Possibly replace certain packages with an opinionated alternative. These include,
   + `subfiles`
++ Support a bunch of TeX systems, meaning different TeX formats/distributions as well as a variety of TeX engines.
 
 ## Similar projects
 + Tectonic
