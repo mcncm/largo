@@ -102,29 +102,6 @@ fn new_project(init_cmd: &InitSubcommand, conf: &XargoConfig) -> Result<()> {
     init_cmd.execute(conf)
 }
 
-/// Check that a path is a directory that conforms with the layout of a xargo
-/// project.
-fn project_structure_conformant(path: &std::path::Path) -> bool {
-    // Ugh, lousy allocation.
-    let mut path = path.to_owned();
-    path.push(dirs::proj::CONFIG_FILE);
-    if !path.exists() {
-        return false;
-    }
-    path.pop();
-    path.push("src");
-    if !path.exists() {
-        return false;
-    }
-    path.pop();
-    path.push("target");
-    if !path.exists() {
-        return false;
-    }
-    path.pop();
-    true
-}
-
 impl BuildSubcommand {
     fn choose_profile<'a>(
         &'a self,
@@ -195,8 +172,11 @@ impl Subcommand {
                 Ok(())
             }
             Subcommand::Clean => {
-                let root = dirs::proj::RootDir::find()?;
-                assert!(project_structure_conformant(root.as_ref()));
+                // Reasonable proof that this is a valid project: the manifest
+                // file parses. It's *reasonably* safe to delete a directory if
+                // `proj` is constructed.
+                let proj = project::Project::find()?;
+                let root = proj.root;
                 let build_dir = dirs::proj::BuildDir::from(root);
                 std::fs::remove_dir_all(&build_dir.as_ref())?;
                 std::fs::create_dir(&build_dir.as_ref())?;
