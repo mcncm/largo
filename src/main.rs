@@ -2,9 +2,8 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use serde::{Deserialize, Serialize};
 
-use xargo::{conf::XargoConfig, dirs, tex::*};
+use xargo::{conf::XargoConfig, dirs, project, tex::*};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -42,77 +41,23 @@ struct BuildSubcommand {
     profile: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-struct ProjectConfig {
-    project: ProjectConfigGeneral,
-    profile: HashMap<String, Profile>,
-    dependencies: HashMap<String, Dependency>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct ProjectConfigGeneral {
-    name: String,
-    system: TexFormat,
-    engine: TexEngine,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-struct Profile {
-    output_format: OutputFormat,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-enum Dependency {
-    Path { path: String },
-}
-
-#[derive(Debug)]
-struct Project {
-    root: dirs::proj::RootDir,
-    config: ProjectConfig,
-}
-
-impl Project {
-    fn find() -> Result<Self> {
-        use typedir::SubDir;
-        let root = dirs::proj::RootDir::find()?;
-        let path = dirs::proj::ConfigFile::from(root);
-        let conf: ProjectConfig = config::Config::builder()
-            .add_source(config::File::new(
-                path.as_ref()
-                    .as_os_str()
-                    .to_str()
-                    .expect("non-UTF-8 path or something"),
-                config::FileFormat::Toml,
-            ))
-            .build()?
-            .try_deserialize()?;
-        Ok(Self {
-            root: path.parent(),
-            config: conf,
-        })
-    }
-}
-
 impl InitSubcommand {
-    fn project_toml(&self) -> ProjectConfig {
+    fn project_toml(&self) -> project::ProjectConfig {
         let mut default_profiles = HashMap::new();
         default_profiles.insert(
             "debug".to_string(),
-            Profile {
+            project::Profile {
                 output_format: OutputFormat::Pdf,
             },
         );
         default_profiles.insert(
             "release".to_string(),
-            Profile {
+            project::Profile {
                 output_format: OutputFormat::Pdf,
             },
         );
-        ProjectConfig {
-            project: ProjectConfigGeneral {
+        project::ProjectConfig {
+            project: project::ProjectConfigGeneral {
                 name: self.name.clone(),
                 system: self.system,
                 engine: self.engine,
@@ -181,9 +126,9 @@ fn project_structure_conformant(path: &std::path::Path) -> bool {
 impl BuildSubcommand {
     fn choose_profile<'a>(
         &'a self,
-        proj: &'a ProjectConfig,
+        proj: &'a project::ProjectConfig,
         conf: &'a XargoConfig,
-    ) -> Result<(&'a str, &'a Profile)> {
+    ) -> Result<(&'a str, &'a project::Profile)> {
         let prof_name = self.profile.as_deref().unwrap_or(conf.default_profile());
         let profile = proj
             .profile
@@ -199,13 +144,13 @@ impl BuildSubcommand {
         )
     }
 
-    fn envvars(&self, proj: &ProjectConfig) -> HashMap<&'static str, String> {
+    fn envvars(&self, proj: &project::ProjectConfig) -> HashMap<&'static str, String> {
         let mut vars = HashMap::new();
 
         let mut tex_inputs = String::new();
         for (_dep_name, dep_body) in &proj.dependencies {
             match &dep_body {
-                Dependency::Path { path } => {
+                project::Dependency::Path { path } => {
                     tex_inputs += &path;
                     tex_inputs.push(':');
                 }
@@ -218,7 +163,11 @@ impl BuildSubcommand {
         vars
     }
 
-    fn to_command(&self, proj: &Project, conf: &XargoConfig) -> Result<std::process::Command> {
+    fn to_command(
+        &self,
+        proj: &project::Project,
+        conf: &XargoConfig,
+    ) -> Result<std::process::Command> {
         let (prof_name, _profile) = self.choose_profile(&proj.config, conf)?;
         let program = conf.choose_program(proj.config.project.engine, proj.config.project.system);
         let envvars = self.envvars(&proj.config);
@@ -239,7 +188,7 @@ impl Subcommand {
             Subcommand::New(init_cmd) => Ok(new_project(&init_cmd, conf)?),
             Subcommand::Init(init_cmd) => Ok(init_cmd.execute(conf)?),
             Subcommand::Build(build_cmd) => {
-                let project = Project::find()?;
+                let project = project::Project::find()?;
                 build_cmd.to_command(&project, conf)?.output()?;
                 Ok(())
             }
