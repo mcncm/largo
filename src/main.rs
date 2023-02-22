@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use anyhow::Result;
 use clap::Parser;
@@ -52,7 +52,7 @@ struct BuildSubcommand {
 
 impl InitSubcommand {
     fn project_toml(&self) -> project::ProjectConfig {
-        let mut default_profiles = HashMap::new();
+        let mut default_profiles = BTreeMap::new();
         default_profiles.insert(
             "debug".to_string(),
             project::Profile {
@@ -73,7 +73,7 @@ impl InitSubcommand {
                 shell_escape: None,
             },
             profile: default_profiles,
-            dependencies: HashMap::new(),
+            dependencies: BTreeMap::new(),
         }
     }
 }

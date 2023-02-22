@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::ffi::OsStr;
 
 use anyhow::{anyhow, Result};
@@ -25,10 +25,10 @@ fn tex_input(profile_name: &str) -> TexInput {
 
 /// Environment variables for the build command
 #[derive(Debug, Default)]
-struct BuildVars(HashMap<&'static str, String>);
+struct BuildVars(BTreeMap<&'static str, String>);
 
 impl BuildVars {
-    fn with_dependencies(mut self, deps: &HashMap<String, project::Dependency>) -> Self {
+    fn with_dependencies(mut self, deps: &BTreeMap<String, project::Dependency>) -> Self {
         let mut tex_inputs = String::new();
         for (_dep_name, dep_body) in deps {
             match &dep_body {
@@ -47,7 +47,7 @@ impl BuildVars {
 
 impl From<&project::ProjectConfig> for BuildVars {
     fn from(project_config: &project::ProjectConfig) -> Self {
-        BuildVars(HashMap::new()).with_dependencies(&project_config.dependencies)
+        BuildVars(BTreeMap::new()).with_dependencies(&project_config.dependencies)
     }
 }
 

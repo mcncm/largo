@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -14,8 +14,8 @@ pub struct Project {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProjectConfig {
     pub project: ProjectConfigGeneral,
-    pub profile: HashMap<String, Profile>,
-    pub dependencies: HashMap<String, Dependency>,
+    pub profile: BTreeMap<String, Profile>,
+    pub dependencies: BTreeMap<String, Dependency>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

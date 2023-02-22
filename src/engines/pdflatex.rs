@@ -1,5 +1,12 @@
 use serde::Serialize;
 
+pub struct Pdflatex<'a> {
+    binary: &'a dyn AsRef<std::ffi::OsStr>,
+    cli_options: CommandLineOptions,
+}
+
+impl<'a> super::TexEngine for Pdflatex<'a> {}
+
 #[derive(Debug, Clone, Serialize)]
 pub enum InteractionMode {
     BatchMode,
