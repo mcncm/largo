@@ -1,5 +1,5 @@
 {
-  description = "Xargo TeX build system";
+  description = "Largo TeX build system";
 
   inputs = {
     # Rust toolchain
@@ -27,7 +27,7 @@
 
         binWithFeatures = { buildFeatures ? [ ] }:
           rustPlatform.buildRustPackage {
-            pname = "xargo";
+            pname = "largo";
             version = "0.1.0";
             src = ./.;
             cargoLock.lockFile = ./Cargo.lock;

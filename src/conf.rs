@@ -23,7 +23,7 @@ impl AsRef<std::ffi::OsStr> for Executable {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct XargoConfig {
+pub struct LargoConfig {
     tex_executable: Executable,
     latex_executable: Executable,
     pdftex_executable: Executable,
@@ -40,7 +40,7 @@ pub struct XargoConfig {
     default_bibliography: Option<String>,
 }
 
-impl XargoConfig {
+impl LargoConfig {
     pub fn new() -> Result<Self> {
         let mut builder = config::Config::builder()
             .set_default("tex-executable", "tex")?

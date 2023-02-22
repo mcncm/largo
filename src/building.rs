@@ -3,7 +3,7 @@ use std::ffi::OsStr;
 
 use anyhow::{anyhow, Result};
 
-use crate::conf::{Executable, XargoConfig};
+use crate::conf::{Executable, LargoConfig};
 use crate::dirs;
 use crate::project::{self, Project};
 
@@ -63,7 +63,7 @@ impl<'a> BuildCmd<'a> {
     pub fn new(
         profile: &'a Option<String>,
         proj: &'a Project,
-        conf: &'a XargoConfig,
+        conf: &'a LargoConfig,
     ) -> Result<Self> {
         let prof_name = profile.as_deref().unwrap_or(conf.default_profile());
         let _profile = proj

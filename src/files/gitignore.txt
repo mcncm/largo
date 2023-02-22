@@ -1,6 +1,6 @@
 # Your .gitignore here
 
-# xargo-specific files and directories
+# largo-specific files and directories
 target/
 
 ########################################################################

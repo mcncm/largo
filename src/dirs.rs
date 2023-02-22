@@ -4,8 +4,8 @@ pub mod proj {
     pub const SRC_DIR: &'static str = "src";
     pub const MAIN_FILE: &'static str = "main.tex";
     pub const BUILD_DIR: &'static str = "build";
-    pub const CONFIG_FILE: &'static str = "xargo.toml";
-    pub const LOCK_FILE: &'static str = "Xargo.lock";
+    pub const CONFIG_FILE: &'static str = "largo.toml";
+    pub const LOCK_FILE: &'static str = "Largo.lock";
     pub const GITIGNORE: &'static str = ".gitignore";
 
     typedir::typedir! {
@@ -20,7 +20,7 @@ pub mod proj {
         };
     }
 
-    /// Initialize a xargo project directory at the passed root
+    /// Initialize a largo project directory at the passed root
     pub fn init(root: std::path::PathBuf, new_proj: NewProject) -> Result<()> {
         // NOTE: This is *extremely* verbose without some kind of "pop-on-drop"
         // list structure. Unfortunately, that seems to be tricky to mix with
@@ -116,7 +116,7 @@ pub mod conf {
     use anyhow::{anyhow, Error, Result};
     use std::path::PathBuf;
 
-    pub const CONFIG_DIR: &'static str = ".xargo";
+    pub const CONFIG_DIR: &'static str = ".largo";
     pub const CONFIG_FILE: &'static str = "config.toml";
 
     // The directory that the

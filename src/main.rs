@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 use clap::Parser;
 
-use xargo::{conf::XargoConfig, dirs, project, tex::*};
+use largo::{conf::LargoConfig, dirs, project, tex::*};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -20,7 +20,7 @@ enum Subcommand {
     Clean,
     Eject,
     #[cfg(debug_assertions)]
-    DebugXargo,
+    DebugLargo,
     #[cfg(debug_assertions)]
     DebugProject,
     #[cfg(debug_assertions)]
@@ -94,7 +94,7 @@ fn new_project(init_cmd: &InitSubcommand) -> Result<()> {
 }
 
 impl Subcommand {
-    fn execute(&self, conf: &XargoConfig) -> Result<()> {
+    fn execute(&self, conf: &LargoConfig) -> Result<()> {
         match &self {
             Subcommand::New(init_cmd) => Ok(new_project(&init_cmd)?),
             Subcommand::Init(init_cmd) => {
@@ -103,7 +103,7 @@ impl Subcommand {
             }
             Subcommand::Build(build_cmd) => {
                 let project = project::Project::find()?;
-                let build_cmd = xargo::building::BuildCmd::new(&build_cmd.profile, &project, conf)?;
+                let build_cmd = largo::building::BuildCmd::new(&build_cmd.profile, &project, conf)?;
                 let mut shell_cmd: std::process::Command = build_cmd.into();
                 shell_cmd.output()?;
                 Ok(())
@@ -122,13 +122,13 @@ impl Subcommand {
             #[cfg(debug_assertions)]
             Subcommand::DebugBuild(build_cmd) => {
                 let project = project::Project::find()?;
-                let build_cmd = xargo::building::BuildCmd::new(&build_cmd.profile, &project, conf)?;
+                let build_cmd = largo::building::BuildCmd::new(&build_cmd.profile, &project, conf)?;
                 let shell_cmd: std::process::Command = build_cmd.into();
                 println!("{:#?}", shell_cmd);
                 Ok(())
             }
             #[cfg(debug_assertions)]
-            Subcommand::DebugXargo => {
+            Subcommand::DebugLargo => {
                 println!("{:#?}", conf);
                 Ok(())
             }
@@ -145,6 +145,6 @@ impl Subcommand {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let conf = XargoConfig::new()?;
+    let conf = LargoConfig::new()?;
     cli.command.execute(&conf)
 }
