@@ -19,7 +19,9 @@ enum Subcommand {
     Build(BuildSubcommand),
     Clean,
     Eject,
+    #[cfg(debug_assertions)]
     DebugXargo,
+    #[cfg(debug_assertions)]
     DebugProject,
 }
 
@@ -200,11 +202,17 @@ impl Subcommand {
                 std::fs::create_dir(&build_dir.as_ref())?;
                 Ok(())
             }
+            #[cfg(debug_assertions)]
             Subcommand::DebugXargo => {
-                println!("{:?}", conf);
+                println!("{:#?}", conf);
                 Ok(())
             }
-            Subcommand::DebugProject => todo!(),
+            #[cfg(debug_assertions)]
+            Subcommand::DebugProject => {
+                let proj = project::Project::find()?;
+                println!("{:#?}", proj);
+                Ok(())
+            }
             Subcommand::Eject => todo!(),
         }
     }
