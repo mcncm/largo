@@ -1,35 +1,8 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-
-const XARGO_CONFIG_DIR: &'static str = ".xargo";
-const XARGO_CONFIG_FILE: &'static str = "config.toml";
-const XARGO_CONFIG_DIR_FILE: &'static str = ".xargo/config.toml";
-
-#[allow(dead_code)]
-fn xargo_home() -> Option<PathBuf> {
-    // This if/else chain should optimize away, it's guaranteed to be exhaustive
-    // (unlike `#[cfg(...)]`), and rust-analyzer won't ignore the dead cases.
-    if cfg!(target_family = "unix") {
-        Some(PathBuf::from(std::env::var("HOME").ok()?))
-    } else if cfg!(target_family = "windows") {
-        Some(PathBuf::from(std::env::var("USERPROFILE").ok()?))
-    } else {
-        // The only other `target_family` at this time is `wasm`.
-        None
-    }
-}
-
-#[allow(dead_code)]
-fn xargo_global_config_path() -> Option<PathBuf> {
-    xargo_home().and_then(|mut path| {
-        path.push(XARGO_CONFIG_DIR);
-        path.push(XARGO_CONFIG_FILE);
-        Some(path)
-    })
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -52,26 +25,18 @@ impl XargoConfig {
         let mut builder = config::Config::builder()
             .set_default("default-profile", "debug")
             .unwrap();
-        // FIXME: race condition!
-        if std::path::Path::new(XARGO_CONFIG_DIR_FILE).exists() {
-            // Use a *local* config as the primary source.
-            builder = builder.add_source(config::File::new(
-                XARGO_CONFIG_DIR_FILE,
-                config::FileFormat::Toml,
-            ));
-        }
-        if let Some(path) = xargo_global_config_path() {
-            // FIXME: race condition!
-            if path.exists() {
-                // Fall back on a *global* config
-                builder = builder.add_source(config::File::new(
-                    path.as_os_str()
-                        .to_str()
-                        .expect("global config file has some kind of non-UTF-8 path"),
-                    config::FileFormat::Toml,
-                ));
-            }
-        }
+
+        // TODO: project-local config override
+        // // FIXME: race condition!
+        // if config_dir.as_ref().exists() {
+        //     // Use a *local* config as the primary source.
+        //     builder = builder.add_source(config_dir::ConfigFileSource::try_from(&config_file)?);
+        // }
+
+        let config_dir = config_dir::ConfigDir::global_config()?;
+        let config_file = config_dir::ConfigFile::from(config_dir);
+        // Fall back on a *global* config
+        builder = builder.add_source(config_dir::ConfigFileSource::try_from(&config_file)?);
         Ok(builder.build()?.try_deserialize()?)
     }
 
@@ -116,6 +81,7 @@ enum Subcommand {
     Init(InitSubcommand),
     Build(BuildSubcommand),
     Clean,
+    Eject,
     DebugXargo,
     DebugProject,
 }
@@ -190,7 +156,72 @@ enum Dependency {
     Path { path: String },
 }
 
-mod projdir {
+mod config_dir {
+    use anyhow::{anyhow, Error, Result};
+    use std::path::PathBuf;
+
+    const CONFIG_DIR: &'static str = ".xargo";
+    const CONFIG_FILE: &'static str = "config.toml";
+
+    // The directory that the
+    #[allow(dead_code)]
+    fn home_directory() -> Result<PathBuf> {
+        // This if/else chain should optimize away, it's guaranteed to be exhaustive
+        // (unlike `#[cfg(...)]`), and rust-analyzer won't ignore the dead cases.
+        if cfg!(target_family = "unix") {
+            Ok(PathBuf::from(std::env::var("HOME")?))
+        } else if cfg!(target_family = "windows") {
+            Ok(PathBuf::from(std::env::var("USERPROFILE")?))
+        } else {
+            // The only other `target_family` at this time is `wasm`.
+            unreachable!("target unsupported");
+        }
+    }
+
+    typedir::typedir! {
+        node ConfigDir {
+            CONFIG_FILE => node ConfigFile;
+        };
+    }
+
+    impl ConfigDir {
+        #[allow(dead_code)]
+        pub fn global_config() -> Result<Self> {
+            let mut path = home_directory()?;
+            path.push(CONFIG_DIR);
+            Ok(Self(path))
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct ConfigFileSource(config::File<config::FileSourceFile, config::FileFormat>);
+
+    impl<'a> TryFrom<&'a ConfigFile> for ConfigFileSource {
+        type Error = Error;
+
+        fn try_from(path: &'a ConfigFile) -> Result<Self> {
+            let source = config::File::new(
+                path.as_ref()
+                    .to_str()
+                    .ok_or(anyhow!("failed to convert config file path to string"))?,
+                config::FileFormat::Toml,
+            );
+            Ok(Self(source))
+        }
+    }
+
+    impl config::Source for ConfigFileSource {
+        fn clone_into_box(&self) -> Box<dyn config::Source + Send + Sync> {
+            self.0.clone_into_box()
+        }
+
+        fn collect(&self) -> Result<config::Map<String, config::Value>, config::ConfigError> {
+            Ok(self.0.collect()?)
+        }
+    }
+}
+
+mod proj_dir {
     use anyhow::{anyhow, Result};
 
     pub const SRC_DIR: &'static str = "src";
@@ -232,15 +263,15 @@ mod projdir {
 
 #[derive(Debug)]
 struct Project {
-    root: projdir::RootDir,
+    root: proj_dir::RootDir,
     config: ProjectConfig,
 }
 
 impl Project {
-    fn find_enclosing() -> Result<Self> {
+    fn find() -> Result<Self> {
         use typedir::SubDir;
-        let root = projdir::RootDir::find()?;
-        let path = projdir::ConfigFile::from(root);
+        let root = proj_dir::RootDir::find()?;
+        let path = proj_dir::ConfigFile::from(root);
         let conf: ProjectConfig = config::Config::builder()
             .add_source(config::File::new(
                 path.as_ref()
@@ -292,10 +323,10 @@ impl InitSubcommand {
         // Prepare the project config file
         let project_toml = self.project_toml();
         let project_toml = toml::ser::to_vec(&project_toml)?;
-        let mut toml = std::fs::File::create(projdir::CONFIG_FILE)?;
+        let mut toml = std::fs::File::create(proj_dir::CONFIG_FILE)?;
         toml.write_all(&project_toml)?;
         // Prepare the source directory
-        std::fs::create_dir(projdir::SRC_DIR)?;
+        std::fs::create_dir(proj_dir::SRC_DIR)?;
         // Create the `main.tex` file
         let mut main = std::fs::File::create("src/main.tex")?;
         main.write_all(match self.system {
@@ -305,7 +336,7 @@ impl InitSubcommand {
         let mut gitignore = std::fs::File::create(".gitignore")?;
         gitignore.write_all(include_bytes!("files/gitignore.txt"))?;
         // Prepare the build directory
-        std::fs::create_dir(projdir::BUILD_DIR)?;
+        std::fs::create_dir(proj_dir::BUILD_DIR)?;
         Ok(())
     }
 }
@@ -322,7 +353,7 @@ fn new_project(init_cmd: &InitSubcommand, conf: &XargoConfig) -> Result<()> {
 fn project_structure_conformant(path: &std::path::Path) -> bool {
     // Ugh, lousy allocation.
     let mut path = path.to_owned();
-    path.push(projdir::CONFIG_FILE);
+    path.push(proj_dir::CONFIG_FILE);
     if !path.exists() {
         return false;
     }
@@ -389,7 +420,7 @@ impl BuildSubcommand {
             cmd.env(var, val);
         }
         cmd.current_dir(&proj.root);
-        cmd.args(["-output-directory", projdir::BUILD_DIR]);
+        cmd.args(["-output-directory", proj_dir::BUILD_DIR]);
         cmd.arg(&self.tex_input(&prof_name));
         Ok(cmd)
     }
@@ -401,14 +432,14 @@ impl Subcommand {
             Subcommand::New(init_cmd) => Ok(new_project(&init_cmd, conf)?),
             Subcommand::Init(init_cmd) => Ok(init_cmd.execute(conf)?),
             Subcommand::Build(build_cmd) => {
-                let project = Project::find_enclosing()?;
+                let project = Project::find()?;
                 build_cmd.to_command(&project, conf)?.output()?;
                 Ok(())
             }
             Subcommand::Clean => {
-                let root = projdir::RootDir::find()?;
+                let root = proj_dir::RootDir::find()?;
                 assert!(project_structure_conformant(root.as_ref()));
-                let build_dir = projdir::BuildDir::from(root);
+                let build_dir = proj_dir::BuildDir::from(root);
                 std::fs::remove_dir_all(&build_dir.as_ref())?;
                 std::fs::create_dir(&build_dir.as_ref())?;
                 Ok(())
@@ -418,6 +449,7 @@ impl Subcommand {
                 Ok(())
             }
             Subcommand::DebugProject => todo!(),
+            Subcommand::Eject => todo!(),
         }
     }
 }

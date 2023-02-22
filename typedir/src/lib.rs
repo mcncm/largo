@@ -9,6 +9,13 @@ pub trait SubDir: From<Self::Parent> {
     fn parent(self) -> Self::Parent;
 }
 
+pub struct Ref<'a, T>
+where
+    T: Node,
+{
+    _node: &'a T,
+}
+
 // macro_rules! typedir_ctx {
 //     (sup $Parent:ident in $)
 //     (node $Parent:ident / $link:expr => $sub:ident)
