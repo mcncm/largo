@@ -68,6 +68,7 @@ impl InitSubcommand {
                 name: self.name.clone(),
                 system: self.system,
                 engine: self.engine,
+                shell_escape: None,
             },
             profile: default_profiles,
             dependencies: HashMap::new(),

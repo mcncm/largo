@@ -15,9 +15,10 @@ impl AsRef<OsStr> for TexInput {
     }
 }
 
+// TODO Other TeX vars: `\X:OUTPPUTDIR`
 fn tex_input(profile_name: &str) -> TexInput {
     TexInput(format!(
-        concat!(r#"\def\XPROFILE{{{}}}"#, r#"\input{{{}}}"#),
+        concat!(r#"\def\X:PROFILE{{{}}}"#, r#"\input{{{}}}"#),
         profile_name, "src/main.tex"
     ))
 }
@@ -55,6 +56,7 @@ pub struct BuildCmd<'a> {
     build_vars: BuildVars,
     tex_input: TexInput,
     executable: &'a Executable,
+    shell_escape: Option<bool>,
 }
 
 impl<'a> BuildCmd<'a> {
@@ -76,6 +78,7 @@ impl<'a> BuildCmd<'a> {
             build_vars: BuildVars::from(&proj.config),
             tex_input: tex_input(&prof_name),
             executable: conf.choose_program(format, engine),
+            shell_escape: proj.config.project.shell_escape,
         })
     }
 }
@@ -83,12 +86,18 @@ impl<'a> BuildCmd<'a> {
 impl Into<std::process::Command> for BuildCmd<'_> {
     fn into(self) -> std::process::Command {
         let mut cmd = std::process::Command::new(&self.executable);
+        cmd.current_dir(self.build_root);
         for (var, val) in &self.build_vars.0 {
             cmd.env(var, val);
         }
-        cmd.current_dir(self.build_root);
-        cmd.args(["-output-directory", dirs::proj::BUILD_DIR]);
-        cmd.arg(&self.tex_input);
+        match &self.shell_escape {
+            Some(true) => cmd.arg("-shell-escape"),
+            Some(false) => cmd.arg("-no-shell-escape"),
+            // Needed to make types match
+            None => &mut cmd,
+        }
+        .args(["-output-directory", dirs::proj::BUILD_DIR])
+        .arg(&self.tex_input);
         cmd
     }
 }

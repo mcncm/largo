@@ -23,6 +23,7 @@ pub struct ProjectConfigGeneral {
     pub name: String,
     pub system: tex::TexFormat,
     pub engine: tex::TexEngine,
+    pub shell_escape: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
