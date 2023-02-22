@@ -15,7 +15,7 @@ impl AsRef<OsStr> for TexInput {
     }
 }
 
-// TODO Other TeX vars: `\X:OUTPPUTDIR`
+// TODO Other TeX vars: `\X:OUTPUTDIR`
 fn tex_input(profile_name: &str) -> TexInput {
     TexInput(format!(
         concat!(r#"\def\X:PROFILE{{{}}}"#, r#"\input{{{}}}"#),
@@ -90,6 +90,18 @@ impl Into<std::process::Command> for BuildCmd<'_> {
         for (var, val) in &self.build_vars.0 {
             cmd.env(var, val);
         }
+        let mut pdflatex_options = crate::engines::pdflatex::CommandLineOptions::default();
+        match self.shell_escape {
+            Some(true) => {
+                pdflatex_options.shell_escape = true;
+            }
+            Some(false) => {
+                pdflatex_options.no_shell_escape = true;
+            }
+            None => (),
+        };
+        use clam::Options;
+        pdflatex_options.apply(&mut cmd);
         match &self.shell_escape {
             Some(true) => cmd.arg("-shell-escape"),
             Some(false) => cmd.arg("-no-shell-escape"),

@@ -35,6 +35,9 @@ pub struct XargoConfig {
 
     /// The default profile selected if no other profile is chosen.
     default_profile: String,
+
+    /// Global bibliography file
+    default_bibliography: Option<String>,
 }
 
 impl XargoConfig {
@@ -48,7 +51,8 @@ impl XargoConfig {
             .set_default("xelatex-executable", "xelatex")?
             .set_default("luatex-executable", "luatex")?
             .set_default("lualatex-executable", "lualatex")?
-            .set_default("default-profile", "debug")?;
+            .set_default("default-profile", "debug")?
+            .set_default("default-bibliography", None::<String>)?;
 
         // TODO: project-local config override
         // // FIXME: race condition!

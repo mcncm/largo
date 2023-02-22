@@ -13,3 +13,4 @@ toml = { version = "0.5.9", features = [ "preserve_order" ] }
 thiserror = "1.0"
 anyhow = "1.0"
 typedir = { path = "./typedir" }
+clam = { path = "./clam" }

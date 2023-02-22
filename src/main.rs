@@ -23,6 +23,8 @@ enum Subcommand {
     DebugXargo,
     #[cfg(debug_assertions)]
     DebugProject,
+    #[cfg(debug_assertions)]
+    DebugBuild(BuildSubcommand),
 }
 
 #[derive(Parser)]
@@ -115,6 +117,14 @@ impl Subcommand {
                 let build_dir = dirs::proj::BuildDir::from(root);
                 std::fs::remove_dir_all(&build_dir.as_ref())?;
                 std::fs::create_dir(&build_dir.as_ref())?;
+                Ok(())
+            }
+            #[cfg(debug_assertions)]
+            Subcommand::DebugBuild(build_cmd) => {
+                let project = project::Project::find()?;
+                let build_cmd = xargo::building::BuildCmd::new(&build_cmd.profile, &project, conf)?;
+                let shell_cmd: std::process::Command = build_cmd.into();
+                println!("{:#?}", shell_cmd);
                 Ok(())
             }
             #[cfg(debug_assertions)]
