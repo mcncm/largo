@@ -4,7 +4,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use crate::dirs;
-use crate::tex::*;
+use crate::options::*;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Executable(String);
@@ -24,20 +24,22 @@ impl AsRef<std::ffi::OsStr> for Executable {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct LargoConfig {
-    tex_executable: Executable,
-    latex_executable: Executable,
-    pdftex_executable: Executable,
-    pdflatex_executable: Executable,
-    xetex_executable: Executable,
-    xelatex_executable: Executable,
-    luatex_executable: Executable,
-    lualatex_executable: Executable,
-
+    pub tex_executable: Executable,
+    pub latex_executable: Executable,
+    pub pdftex_executable: Executable,
+    pub pdflatex_executable: Executable,
+    pub xetex_executable: Executable,
+    pub xelatex_executable: Executable,
+    pub luatex_executable: Executable,
+    pub lualatex_executable: Executable,
     /// The default profile selected if no other profile is chosen.
-    default_profile: String,
-
+    pub default_profile: String,
+    /// The default TeX format
+    pub default_tex_format: crate::options::TexFormat,
+    /// The default TeX engine
+    pub default_tex_engine: crate::options::TexEngine,
     /// Global bibliography file
-    default_bibliography: Option<String>,
+    pub default_bibliography: Option<String>,
 }
 
 impl LargoConfig {
@@ -52,6 +54,8 @@ impl LargoConfig {
             .set_default("luatex-executable", "luatex")?
             .set_default("lualatex-executable", "lualatex")?
             .set_default("default-profile", "debug")?
+            .set_default("default-system", "latex")?
+            .set_default("default-engine", "pdftex")?
             .set_default("default-bibliography", None::<String>)?;
 
         // TODO: project-local config override

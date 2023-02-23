@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use anyhow::Result;
 use clap::Parser;
 
-use largo::{conf::LargoConfig, dirs, project, tex::*};
+use largo::{conf::LargoConfig, dirs, options::*, project};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -52,27 +52,16 @@ struct BuildSubcommand {
 
 impl InitSubcommand {
     fn project_toml(&self) -> project::ProjectConfig {
-        let mut default_profiles = BTreeMap::new();
-        default_profiles.insert(
-            "debug".to_string(),
-            project::Profile {
-                output_format: OutputFormat::Pdf,
-            },
-        );
-        default_profiles.insert(
-            "release".to_string(),
-            project::Profile {
-                output_format: OutputFormat::Pdf,
-            },
-        );
         project::ProjectConfig {
-            project: project::ProjectConfigGeneral {
+            project: project::ProjectConfigHead {
                 name: self.name.clone(),
-                system: self.system,
-                engine: self.engine,
-                shell_escape: None,
+                system_settings: project::SystemSettings {
+                    tex_format: None,
+                    tex_engine: None,
+                },
+                project_settings: project::ProjectSettings::default(),
             },
-            profile: default_profiles,
+            profiles: BTreeMap::new(),
             dependencies: BTreeMap::new(),
         }
     }
@@ -103,7 +92,7 @@ impl Subcommand {
             }
             Subcommand::Build(build_cmd) => {
                 let project = project::Project::find()?;
-                let build_cmd = largo::building::BuildCmd::new(&build_cmd.profile, &project, conf)?;
+                let build_cmd = largo::building::BuildCmd::new(&build_cmd.profile, project, conf)?;
                 let mut shell_cmd: std::process::Command = build_cmd.into();
                 shell_cmd.output()?;
                 Ok(())
@@ -122,7 +111,7 @@ impl Subcommand {
             #[cfg(debug_assertions)]
             Subcommand::DebugBuild(build_cmd) => {
                 let project = project::Project::find()?;
-                let build_cmd = largo::building::BuildCmd::new(&build_cmd.profile, &project, conf)?;
+                let build_cmd = largo::building::BuildCmd::new(&build_cmd.profile, project, conf)?;
                 let shell_cmd: std::process::Command = build_cmd.into();
                 println!("{:#?}", shell_cmd);
                 Ok(())

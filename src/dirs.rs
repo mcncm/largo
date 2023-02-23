@@ -5,7 +5,7 @@ pub mod proj {
     pub const MAIN_FILE: &'static str = "main.tex";
     pub const BUILD_DIR: &'static str = "build";
     pub const CONFIG_FILE: &'static str = "largo.toml";
-    pub const LOCK_FILE: &'static str = "Largo.lock";
+    pub const LOCK_FILE: &'static str = "largo.lock";
     pub const GITIGNORE: &'static str = ".gitignore";
 
     typedir::typedir! {
