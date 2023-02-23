@@ -41,7 +41,7 @@ impl<'a> LargoVars<'a> {
 fn tex_input(profile_name: &str) -> TexInput {
     let vars = LargoVars::new(profile_name);
     let vars = vars.to_defs();
-    let main_file = "src/main.tex";
+    let main_file = dirs::proj::MAIN_FILE;
     TexInput(format!(r#"{vars}\input{{{main_file}}}"#))
 }
 
@@ -116,8 +116,11 @@ impl<'a> BuildCmd<'a> {
 
 impl Into<std::process::Command> for BuildCmd<'_> {
     fn into(self) -> std::process::Command {
+        use typedir::SubDir;
         let mut cmd = std::process::Command::new(&self.executable);
-        cmd.current_dir(self.build_root);
+        let src_dir = dirs::proj::SrcDir::from(self.build_root);
+        cmd.current_dir(&src_dir);
+        let root_dir = src_dir.parent();
         for (var, val) in &self.build_vars.0 {
             cmd.env(var, val);
         }
@@ -139,7 +142,13 @@ impl Into<std::process::Command> for BuildCmd<'_> {
             // Needed to make types match
             None => &mut cmd,
         }
-        .args(["-output-directory", dirs::proj::BUILD_DIR])
+        .args([
+            "-output-directory",
+            dirs::proj::BuildDir::from(root_dir)
+                .as_ref()
+                .to_str()
+                .expect("some kind of non-utf8 path"),
+        ])
         .arg(&self.tex_input);
         cmd
     }
