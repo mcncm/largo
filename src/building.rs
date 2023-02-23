@@ -3,9 +3,9 @@ use std::ffi::OsStr;
 
 use anyhow::{anyhow, Result};
 
-use crate::conf::{Executable, LargoConfig};
+use crate::conf::{self, LargoConfig};
 use crate::dirs;
-use crate::project::{self, Project, ProjectSettings, SystemSettings};
+use crate::project::{self, Dependencies, Project, ProjectSettings, SystemSettings};
 
 struct TexInput(String);
 
@@ -76,56 +76,97 @@ impl BuildVars {
     }
 }
 
-pub struct BuildCmd<'a> {
-    build_root: dirs::proj::RootDir,
-    build_vars: BuildVars,
-    tex_input: TexInput,
-    executable: &'a Executable,
-    project_settings: ProjectSettings,
+pub struct BuildBuilder<'a> {
+    conf: &'a LargoConfig,
+    project: Project,
+    /// Which profile to build in
+    profile_name: Option<&'a str>,
 }
 
-pub struct BuildSettings {
-    pub root_dir: dirs::proj::RootDir,
-    pub system_settings: SystemSettings,
-    pub project_settings: ProjectSettings,
-}
+impl<'a> BuildBuilder<'a> {
+    pub fn new(conf: &'a LargoConfig, project: Project) -> Self {
+        Self {
+            conf,
+            project,
+            profile_name: None,
+        }
+    }
 
-impl<'a> BuildCmd<'a> {
-    pub fn new(profile: &'a Option<String>, proj: Project, conf: &'a LargoConfig) -> Result<Self> {
-        let prof_name = profile.as_ref().unwrap_or(&conf.default_profile);
-        let profiles = proj.config.profiles;
+    pub fn with_profile_name(mut self, name: &'a Option<String>) -> Self {
+        self.profile_name = name.as_ref().map(|x| x.as_str());
+        self
+    }
+
+    /// Unpack the data we've been passed into a more convenient shape
+    fn to_build_settings(self) -> Result<BuildSettings<'a>> {
+        let conf = self.conf;
+        let project = self.project;
+        let root_dir = project.root;
+        let profile_name = self
+            .profile_name
+            .unwrap_or(self.conf.default_profile.as_str());
+        // FIXME This is a bug: there should *always* be a default profile to select
+        let profiles = project.config.profiles;
         let profile = profiles
-            .select_profile(prof_name)
-            .ok_or_else(|| anyhow!("profile `{}` found", prof_name))?;
-        let proj_config = proj.config.project;
-        let project_settings = proj_config.project_settings.merge(profile.project_settings);
-        let system_settings = proj_config.system_settings.merge(profile.system_settings);
-        let engine = system_settings
-            .tex_engine
-            .unwrap_or(conf.default_tex_engine);
-        let system = system_settings
-            .tex_format
-            .unwrap_or(conf.default_tex_format);
-        let build_vars = BuildVars::new().with_dependencies(&proj.config.dependencies);
-
-        Ok(Self {
-            build_root: proj.root,
-            build_vars,
-            tex_input: tex_input(&prof_name, conf),
-            executable: conf.choose_program(engine, system),
+            .select_profile(profile_name)
+            .ok_or_else(|| anyhow!("profile `{}` not found", profile_name))?;
+        let proj_conf = project.config.project;
+        let project_settings = proj_conf.project_settings.merge(profile.project_settings);
+        let system_settings = proj_conf.system_settings.merge(profile.system_settings);
+        let dependencies = project.config.dependencies;
+        Ok(BuildSettings {
+            conf,
+            root_dir,
+            profile_name,
+            system_settings,
             project_settings,
+            dependencies,
         })
+    }
+
+    pub fn try_finish(self) -> Result<Build> {
+        let build_settings = self.to_build_settings()?;
+        build_settings.to_build()
     }
 }
 
-impl Into<std::process::Command> for BuildCmd<'_> {
-    fn into(self) -> std::process::Command {
+/// An intermediate state of unpackaging and treating all the data we've
+/// received
+struct BuildSettings<'a> {
+    pub conf: &'a LargoConfig,
+    pub root_dir: dirs::proj::RootDir,
+    pub profile_name: &'a str,
+    pub system_settings: SystemSettings,
+    pub project_settings: ProjectSettings,
+    pub dependencies: Dependencies,
+}
+
+impl<'a> BuildSettings<'a> {
+    fn executable(&self) -> &conf::Executable {
+        let engine = self
+            .system_settings
+            .tex_engine
+            .unwrap_or(self.conf.default_tex_engine);
+        let system = self
+            .system_settings
+            .tex_format
+            .unwrap_or(self.conf.default_tex_format);
+        self.conf.choose_program(engine, system)
+    }
+
+    fn build_vars(&self) -> BuildVars {
+        BuildVars::new().with_dependencies(&self.dependencies)
+    }
+
+    fn build_command(self) -> std::process::Command {
         use typedir::SubDir;
-        let mut cmd = std::process::Command::new(&self.executable);
-        let src_dir = dirs::proj::SrcDir::from(self.build_root);
+        let tex_input = tex_input(&self.profile_name, self.conf);
+        let build_vars = self.build_vars();
+        let mut cmd = std::process::Command::new(self.executable());
+        let src_dir = dirs::proj::SrcDir::from(self.root_dir);
         cmd.current_dir(&src_dir);
         let root_dir = src_dir.parent();
-        for (var, val) in &self.build_vars.0 {
+        for (var, val) in build_vars.0 {
             cmd.env(var, val);
         }
         let mut pdflatex_options = crate::engines::pdflatex::CommandLineOptions::default();
@@ -153,7 +194,25 @@ impl Into<std::process::Command> for BuildCmd<'_> {
                 .to_str()
                 .expect("some kind of non-utf8 path"),
         ])
-        .arg(&self.tex_input);
+        .arg(&tex_input);
         cmd
+    }
+
+    fn to_build(self) -> Result<Build> {
+        Ok(Build {
+            shell_cmd: self.build_command(),
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct Build {
+    shell_cmd: std::process::Command,
+}
+
+impl Build {
+    pub fn run(mut self) -> Result<()> {
+        self.shell_cmd.output()?;
+        Ok(())
     }
 }

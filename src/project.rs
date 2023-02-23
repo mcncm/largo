@@ -14,9 +14,9 @@ pub struct Project {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProjectConfig {
     pub project: ProjectConfigHead,
-    #[serde(rename = "profile", flatten)]
+    #[serde(rename = "profile", default)]
     pub profiles: Profiles,
-    #[serde(flatten)]
+    #[serde(default)]
     pub dependencies: Dependencies,
 }
 
@@ -29,7 +29,7 @@ pub struct ProjectConfigHead {
     pub system_settings: SystemSettings,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Profiles(BTreeMap<String, Profile>);
 
 impl Profiles {
@@ -83,7 +83,7 @@ impl ProjectSettings {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Dependencies(BTreeMap<String, Dependency>);
 
 impl Dependencies {
