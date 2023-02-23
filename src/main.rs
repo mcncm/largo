@@ -138,6 +138,7 @@ impl ProjectSubcommand {
                 println!("{:#?}", project);
                 Ok(())
             }
+            #[cfg(debug_assertions)]
             DebugBuild(subcmd) => {
                 let build = subcmd.try_into_build(project, conf)?;
                 println!("{:#?}", build);
@@ -156,6 +157,7 @@ impl Subcommand {
                 let conf = conf::LargoConfig::new()?;
                 subcmd.execute(project, &conf)
             }
+            #[cfg(debug_assertions)]
             Subcommand::DebugLargo => {
                 let conf = conf::LargoConfig::new()?;
                 println!("{:#?}", conf);
