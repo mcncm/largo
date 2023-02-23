@@ -21,9 +21,12 @@ impl AsRef<OsStr> for TexInput {
 struct LargoVars<'a>(std::collections::BTreeMap<&'static str, &'a str>);
 
 impl<'a> LargoVars<'a> {
-    fn new(profile_name: &'a str) -> Self {
+    fn new(profile_name: &'a str, conf: &'a LargoConfig) -> Self {
         let mut vars = std::collections::BTreeMap::new();
         vars.insert("Profile", profile_name.clone());
+        if let Some(bib) = conf.default_bibliography.as_ref() {
+            vars.insert("Biblio", bib);
+        }
         Self(vars)
     }
 
@@ -31,15 +34,15 @@ impl<'a> LargoVars<'a> {
         use std::fmt::Write;
         let mut defs = String::new();
         for (k, v) in self.0.into_iter() {
-            write!(&mut defs, r#"\def\L:{k}{{{v}}}"#).unwrap();
+            write!(&mut defs, r#"\def\Largo{k}{{{v}}}"#).unwrap();
         }
         defs
     }
 }
 
 // TODO Other TeX vars: `\X:OUTPUTDIR`
-fn tex_input(profile_name: &str) -> TexInput {
-    let vars = LargoVars::new(profile_name);
+fn tex_input(profile_name: &str, conf: &LargoConfig) -> TexInput {
+    let vars = LargoVars::new(profile_name, conf);
     let vars = vars.to_defs();
     let main_file = dirs::proj::MAIN_FILE;
     TexInput(format!(r#"{vars}\input{{{main_file}}}"#))
@@ -107,7 +110,7 @@ impl<'a> BuildCmd<'a> {
         Ok(Self {
             build_root: proj.root,
             build_vars,
-            tex_input: tex_input(&prof_name),
+            tex_input: tex_input(&prof_name, conf),
             executable: conf.choose_program(engine, system),
             project_settings,
         })

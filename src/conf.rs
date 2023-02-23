@@ -32,6 +32,7 @@ pub struct LargoConfig {
     pub xelatex_executable: Executable,
     pub luatex_executable: Executable,
     pub lualatex_executable: Executable,
+    pub biber_executable: Executable,
     /// The default profile selected if no other profile is chosen.
     pub default_profile: String,
     /// The default TeX format
@@ -53,6 +54,7 @@ impl LargoConfig {
             .set_default("xelatex-executable", "xelatex")?
             .set_default("luatex-executable", "luatex")?
             .set_default("lualatex-executable", "lualatex")?
+            .set_default("biber-executable", "biber")?
             .set_default("default-profile", "debug")?
             .set_default("default-tex-format", "latex")?
             .set_default("default-tex-engine", "pdftex")?
