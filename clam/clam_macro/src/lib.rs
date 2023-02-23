@@ -4,8 +4,6 @@ use syn::{parse_macro_input, DeriveInput};
 
 /// Code generation
 pub(crate) mod emit;
-/// Error types
-pub(crate) mod err;
 /// The data model (roughly, "IR") of the macro
 pub(crate) mod model;
 
