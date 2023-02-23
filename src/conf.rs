@@ -89,8 +89,4 @@ impl LargoConfig {
             (TexEngine::Luatex, TexFormat::Latex) => &self.lualatex_executable,
         }
     }
-
-    pub fn default_profile(&self) -> &str {
-        &self.default_profile
-    }
 }

@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use anyhow::Result;
 use clap::Parser;
 
@@ -72,14 +70,11 @@ impl InitSubcommand {
         project::ProjectConfig {
             project: project::ProjectConfigHead {
                 name: self.name.clone(),
-                system_settings: project::SystemSettings {
-                    tex_format: None,
-                    tex_engine: None,
-                },
+                system_settings: project::SystemSettings::default(),
                 project_settings: project::ProjectSettings::default(),
             },
-            profiles: BTreeMap::new(),
-            dependencies: BTreeMap::new(),
+            profiles: project::Profiles::new(),
+            dependencies: project::Dependencies::new(),
         }
     }
 }

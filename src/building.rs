@@ -23,7 +23,7 @@ struct LargoVars<'a>(std::collections::BTreeMap<&'static str, &'a str>);
 impl<'a> LargoVars<'a> {
     fn new(profile_name: &'a str, conf: &'a LargoConfig) -> Self {
         let mut vars = std::collections::BTreeMap::new();
-        vars.insert("Profile", profile_name.clone());
+        vars.insert("Profile", profile_name);
         if let Some(bib) = conf.default_bibliography.as_ref() {
             vars.insert("Biblio", bib);
         }
@@ -59,7 +59,7 @@ impl BuildVars {
 }
 
 impl BuildVars {
-    fn with_dependencies(mut self, deps: &BTreeMap<String, project::Dependency>) -> Self {
+    fn with_dependencies(mut self, deps: &project::Dependencies) -> Self {
         let mut tex_inputs = String::new();
         for (_dep_name, dep_body) in deps {
             match &dep_body {
@@ -92,10 +92,10 @@ pub struct BuildSettings {
 
 impl<'a> BuildCmd<'a> {
     pub fn new(profile: &'a Option<String>, proj: Project, conf: &'a LargoConfig) -> Result<Self> {
-        let prof_name = profile.as_deref().unwrap_or(conf.default_profile());
-        let mut profiles = proj.config.profiles;
+        let prof_name = profile.as_ref().unwrap_or(&conf.default_profile);
+        let profiles = proj.config.profiles;
         let profile = profiles
-            .remove(prof_name)
+            .select_profile(prof_name)
             .ok_or_else(|| anyhow!("profile `{}` found", prof_name))?;
         let proj_config = proj.config.project;
         let project_settings = proj_config.project_settings.merge(profile.project_settings);

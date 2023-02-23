@@ -14,9 +14,10 @@ pub struct Project {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProjectConfig {
     pub project: ProjectConfigHead,
-    #[serde(rename = "profile")]
-    pub profiles: BTreeMap<String, Profile>,
-    pub dependencies: BTreeMap<String, Dependency>,
+    #[serde(rename = "profile", flatten)]
+    pub profiles: Profiles,
+    #[serde(flatten)]
+    pub dependencies: Dependencies,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -29,6 +30,19 @@ pub struct ProjectConfigHead {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct Profiles(BTreeMap<String, Profile>);
+
+impl Profiles {
+    pub fn new() -> Profiles {
+        Self(BTreeMap::new())
+    }
+
+    pub fn select_profile(mut self, name: &str) -> Option<Profile> {
+        self.0.remove(name)
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Profile {
     #[serde(flatten)]
@@ -37,10 +51,11 @@ pub struct Profile {
     pub system_settings: SystemSettings,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct SystemSettings {
     pub tex_format: Option<options::TexFormat>,
     pub tex_engine: Option<options::TexEngine>,
+    pub bib_engine: Option<options::BibEngine>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -54,6 +69,7 @@ impl SystemSettings {
         Self {
             tex_format: self.tex_format.and(other.tex_format),
             tex_engine: self.tex_engine.and(other.tex_engine),
+            bib_engine: self.bib_engine.and(other.bib_engine),
         }
     }
 }
@@ -64,6 +80,25 @@ impl ProjectSettings {
             output_format: self.output_format.and(other.output_format),
             shell_escape: self.shell_escape.and(other.shell_escape),
         }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Dependencies(BTreeMap<String, Dependency>);
+
+impl Dependencies {
+    pub fn new() -> Self {
+        Self(BTreeMap::new())
+    }
+}
+
+impl<'a> IntoIterator for &'a Dependencies {
+    type Item = <&'a BTreeMap<String, Dependency> as IntoIterator>::Item;
+
+    type IntoIter = <&'a BTreeMap<String, Dependency> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.0).into_iter()
     }
 }
 

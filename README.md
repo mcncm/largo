@@ -20,5 +20,9 @@ Largo tries to do the following things:
   + `subfiles`
 + Support a bunch of TeX systems, meaning different TeX formats/distributions as well as a variety of TeX engines.
 
+## Problem packages
+### Mild problems
++ ~minted~ needs a special flag, ~outputdir~
+
 ## Similar projects
 + Tectonic

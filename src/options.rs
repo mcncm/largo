@@ -25,3 +25,9 @@ pub enum OutputFormat {
     Ps,
     Pdf,
 }
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, clap::ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum BibEngine {
+    Biber,
+}
