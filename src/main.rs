@@ -22,23 +22,31 @@ enum Subcommand {
     #[command(flatten)]
     Project(ProjectSubcommand),
     #[cfg(debug_assertions)]
+    /// Print the Largo configuration
     DebugLargo,
 }
 
 #[derive(clap::Subcommand)]
 enum CreateSubcommand {
+    /// Initialize a largo project in the current directory
     Init(InitSubcommand),
+    /// Create a largo project in a new directory
     New(InitSubcommand),
 }
 
 #[derive(clap::Subcommand)]
 enum ProjectSubcommand {
+    /// Build the current project
     Build(BuildSubcommand),
+    /// Erase the build directory
     Clean,
+    /// Generate a standalone TeX project
     Eject,
     #[cfg(debug_assertions)]
+    /// Print the project configuration
     DebugProject,
     #[cfg(debug_assertions)]
+    /// Print the build plan
     DebugBuild(BuildSubcommand),
 }
 
@@ -53,15 +61,18 @@ struct InitSubcommand {
     /// empty Beamer template.
     #[arg(long)]
     beamer: bool,
-    #[arg(long, value_enum, default_value_t = TexFormat::Latex)]
+    #[arg(long, value_enum)]
+    /// Overrides the default TeX format if set
     system: TexFormat,
-    #[arg(long, value_enum, default_value_t = TexEngine::Pdftex)]
+    #[arg(long, value_enum)]
+    /// Overrides the default TeX engine if set
     engine: TexEngine,
 }
 
 #[derive(Parser)]
 struct BuildSubcommand {
-    #[arg(short = 'F', long)]
+    #[arg(short = 'p', long)]
+    /// Overrides the default build profile if set
     profile: Option<String>,
 }
 
