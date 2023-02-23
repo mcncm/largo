@@ -84,9 +84,10 @@ pub struct BuildCmd<'a> {
     project_settings: ProjectSettings,
 }
 
-struct _BuildSettings {
-    system_settings: SystemSettings,
-    project_settings: ProjectSettings,
+pub struct BuildSettings {
+    pub root_dir: dirs::proj::RootDir,
+    pub system_settings: SystemSettings,
+    pub project_settings: ProjectSettings,
 }
 
 impl<'a> BuildCmd<'a> {

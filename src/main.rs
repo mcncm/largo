@@ -3,7 +3,12 @@ use std::collections::BTreeMap;
 use anyhow::Result;
 use clap::Parser;
 
-use largo::{conf::LargoConfig, dirs, options::*, project};
+use largo::{
+    conf::{self, LargoConfig},
+    dirs,
+    options::*,
+    project,
+};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -14,13 +19,25 @@ struct Cli {
 
 #[derive(clap::Subcommand)]
 enum Subcommand {
-    New(InitSubcommand),
+    #[command(flatten)]
+    Create(CreateSubcommand),
+    #[command(flatten)]
+    Project(ProjectSubcommand),
+    #[cfg(debug_assertions)]
+    DebugLargo,
+}
+
+#[derive(clap::Subcommand)]
+enum CreateSubcommand {
     Init(InitSubcommand),
+    New(InitSubcommand),
+}
+
+#[derive(clap::Subcommand)]
+enum ProjectSubcommand {
     Build(BuildSubcommand),
     Clean,
     Eject,
-    #[cfg(debug_assertions)]
-    DebugLargo,
     #[cfg(debug_assertions)]
     DebugProject,
     #[cfg(debug_assertions)]
@@ -76,64 +93,75 @@ impl InitSubcommand {
     }
 }
 
-fn new_project(init_cmd: &InitSubcommand) -> Result<()> {
-    // Create the project directory
-    std::fs::create_dir(&init_cmd.name)?;
-    init_cmd.execute(std::path::PathBuf::from(&init_cmd.name))
+impl CreateSubcommand {
+    fn execute(&self) -> Result<()> {
+        match &self {
+            CreateSubcommand::Init(subcmd) => {
+                let path = std::env::current_dir().unwrap();
+                subcmd.execute(path)
+            }
+            CreateSubcommand::New(subcmd) => {
+                std::fs::create_dir(&subcmd.name)?;
+                subcmd.execute(std::path::PathBuf::from(&subcmd.name))
+            }
+        }
+    }
 }
 
-impl Subcommand {
-    fn execute(&self, conf: &LargoConfig) -> Result<()> {
+impl ProjectSubcommand {
+    fn execute(&self, project: project::Project, conf: &LargoConfig) -> Result<()> {
+        use ProjectSubcommand::*;
         match &self {
-            Subcommand::New(init_cmd) => Ok(new_project(&init_cmd)?),
-            Subcommand::Init(init_cmd) => {
-                let path = std::env::current_dir().unwrap();
-                Ok(init_cmd.execute(path)?)
-            }
-            Subcommand::Build(build_cmd) => {
-                let project = project::Project::find()?;
-                let build_cmd = largo::building::BuildCmd::new(&build_cmd.profile, project, conf)?;
+            Build(subcmd) => {
+                let build_cmd = largo::building::BuildCmd::new(&subcmd.profile, project, conf)?;
                 let mut shell_cmd: std::process::Command = build_cmd.into();
                 shell_cmd.output()?;
                 Ok(())
             }
-            Subcommand::Clean => {
-                // Reasonable proof that this is a valid project: the manifest
-                // file parses. It's *reasonably* safe to delete a directory if
-                // `proj` is constructed.
-                let proj = project::Project::find()?;
-                let root = proj.root;
+            // the `Project` is reasonable proof that it is a valid project:
+            // the manifest file parses. It's *reasonably* safe to delete a
+            // directory if `proj` is constructed.
+            Clean => {
+                let root = project.root;
                 let build_dir = dirs::proj::BuildDir::from(root);
                 std::fs::remove_dir_all(&build_dir.as_ref())?;
                 std::fs::create_dir(&build_dir.as_ref())?;
                 Ok(())
             }
-            #[cfg(debug_assertions)]
-            Subcommand::DebugBuild(build_cmd) => {
-                let project = project::Project::find()?;
-                let build_cmd = largo::building::BuildCmd::new(&build_cmd.profile, project, conf)?;
+            Eject => todo!(),
+            DebugProject => {
+                println!("{:#?}", project);
+                Ok(())
+            }
+            DebugBuild(subcmd) => {
+                let build_cmd = largo::building::BuildCmd::new(&subcmd.profile, project, conf)?;
                 let shell_cmd: std::process::Command = build_cmd.into();
                 println!("{:#?}", shell_cmd);
                 Ok(())
             }
-            #[cfg(debug_assertions)]
+        }
+    }
+}
+
+impl Subcommand {
+    fn execute(&self) -> Result<()> {
+        match &self {
+            Subcommand::Create(subcmd) => subcmd.execute(),
+            Subcommand::Project(subcmd) => {
+                let project = project::Project::find()?;
+                let conf = conf::LargoConfig::new()?;
+                subcmd.execute(project, &conf)
+            }
             Subcommand::DebugLargo => {
+                let conf = conf::LargoConfig::new()?;
                 println!("{:#?}", conf);
                 Ok(())
             }
-            #[cfg(debug_assertions)]
-            Subcommand::DebugProject => {
-                let proj = project::Project::find()?;
-                println!("{:#?}", proj);
-                Ok(())
-            }
-            Subcommand::Eject => todo!(),
         }
     }
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let conf = LargoConfig::new()?;
-    cli.command.execute(&conf)
+    cli.command.execute()
 }

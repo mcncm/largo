@@ -11,6 +11,7 @@ Largo tries to do the following things:
 + Eliminate source tree pollution in (La)TeX projects
 + Ease the "mixing in" of packages from local directories, git repositories, and other non-official locations.
 + Provide a standardized feature flag system to enable multiple build channels for a project.
++ Built-in dependency management: has your LaTeX distribution ever had a broken version of a package? How did you solve it? What if you could just edit a single line in a config file?
 + Eases bibliography management by allowing a global bibliography. This can be a file, or communicate with Zotero, Mendeley, etc. Talking to a bibliography server over HTTP will not be deterministic, but...
 + Backwards-compatibility via `largo eject` subcommand that produces a standalone, reproducible, `largo`-free TeX project.
   - Writes new bibliography file from global bibliography
