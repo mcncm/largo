@@ -54,8 +54,8 @@ impl LargoConfig {
             .set_default("luatex-executable", "luatex")?
             .set_default("lualatex-executable", "lualatex")?
             .set_default("default-profile", "debug")?
-            .set_default("default-system", "latex")?
-            .set_default("default-engine", "pdftex")?
+            .set_default("default-tex-format", "latex")?
+            .set_default("default-tex-engine", "pdftex")?
             .set_default("default-bibliography", None::<String>)?;
 
         // TODO: project-local config override

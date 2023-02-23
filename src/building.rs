@@ -15,12 +15,34 @@ impl AsRef<OsStr> for TexInput {
     }
 }
 
+/// Variables available at TeX run time
+// FIXME: this implementation is very, very suboptimal. It's particularly bad
+// for documentation for the keys to be dynamic.
+struct LargoVars<'a>(std::collections::BTreeMap<&'static str, &'a str>);
+
+impl<'a> LargoVars<'a> {
+    fn new(profile_name: &'a str) -> Self {
+        let mut vars = std::collections::BTreeMap::new();
+        vars.insert("Profile", profile_name.clone());
+        Self(vars)
+    }
+
+    fn to_defs(self) -> String {
+        use std::fmt::Write;
+        let mut defs = String::new();
+        for (k, v) in self.0.into_iter() {
+            write!(&mut defs, r#"\def\L:{k}{{{v}}}"#).unwrap();
+        }
+        defs
+    }
+}
+
 // TODO Other TeX vars: `\X:OUTPUTDIR`
 fn tex_input(profile_name: &str) -> TexInput {
-    TexInput(format!(
-        concat!(r#"\def\X:PROFILE{{{}}}"#, r#"\input{{{}}}"#),
-        profile_name, "src/main.tex"
-    ))
+    let vars = LargoVars::new(profile_name);
+    let vars = vars.to_defs();
+    let main_file = "src/main.tex";
+    TexInput(format!(r#"{vars}\input{{{main_file}}}"#))
 }
 
 /// Environment variables for the build command
@@ -59,7 +81,7 @@ pub struct BuildCmd<'a> {
     project_settings: ProjectSettings,
 }
 
-struct BuildSettings {
+struct _BuildSettings {
     system_settings: SystemSettings,
     project_settings: ProjectSettings,
 }

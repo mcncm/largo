@@ -27,19 +27,19 @@ impl<T: ArgValue> ArgValue for Option<T> {
 }
 
 impl ArgValue for str {
-    fn set_cmd_arg(&self, name: &str, cmd: &mut Command) {
+    fn set_cmd_arg(&self, _name: &str, _cmd: &mut Command) {
         ()
     }
 }
 
 impl ArgValue for String {
-    fn set_cmd_arg(&self, name: &str, cmd: &mut Command) {
+    fn set_cmd_arg(&self, _name: &str, _cmd: &mut Command) {
         ()
     }
 }
 
 impl<T: ArgValue> ArgValue for Vec<T> {
-    fn set_cmd_arg(&self, name: &str, cmd: &mut Command) {
+    fn set_cmd_arg(&self, _name: &str, _cmd: &mut Command) {
         ()
     }
 }

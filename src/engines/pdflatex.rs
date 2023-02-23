@@ -1,8 +1,8 @@
 use serde::Serialize;
 
 pub struct Pdflatex<'a> {
-    binary: &'a dyn AsRef<std::ffi::OsStr>,
-    cli_options: CommandLineOptions,
+    _binary: &'a dyn AsRef<std::ffi::OsStr>,
+    _cli_options: CommandLineOptions,
 }
 
 impl<'a> super::TexEngine for Pdflatex<'a> {}
