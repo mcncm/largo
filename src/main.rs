@@ -64,10 +64,10 @@ struct InitSubcommand {
     beamer: bool,
     #[arg(long, value_enum)]
     /// Overrides the default TeX format if set
-    system: TexFormat,
+    system: Option<TexFormat>,
     #[arg(long, value_enum)]
     /// Overrides the default TeX engine if set
-    engine: TexEngine,
+    engine: Option<TexEngine>,
 }
 
 #[derive(Parser)]
