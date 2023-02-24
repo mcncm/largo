@@ -5,7 +5,6 @@ use largo::{
     conf::{self, LargoConfig},
     dirs,
     options::*,
-    prelude::*,
     project,
 };
 
@@ -140,7 +139,7 @@ impl ProjectSubcommand {
             // directory if `proj` is constructed.
             Clean => {
                 let root = project.root;
-                let build_dir: Pb<dirs::proj::BuildDir> = root.extend(());
+                let build_dir = typedir::path!(root => dirs::proj::BuildDir);
                 std::fs::remove_dir_all(&build_dir.as_ref())?;
                 std::fs::create_dir(&build_dir.as_ref())?;
                 Ok(())

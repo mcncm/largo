@@ -3,7 +3,9 @@ use std::collections::BTreeMap;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::{dirs, options, prelude::*};
+use crate::{dirs, options};
+
+use typedir::pathref;
 
 #[derive(Debug)]
 pub struct Project {
@@ -113,7 +115,7 @@ impl Project {
         use dirs::proj::*;
         let mut root = RootDir::find()?;
         let conf: ProjectConfig = {
-            let path: Pr<ConfigFile> = (&mut root).extend(());
+            let path = pathref!(root => ConfigFile);
             config::Config::builder()
                 .add_source(config::File::new(
                     path.to_str().expect("non-UTF-8 path or something"),

@@ -235,6 +235,29 @@ macro_rules! typedir {
     };
 }
 
+#[macro_export]
+macro_rules! path {
+    ($root:expr) => {
+        $root
+    };
+    ($root:expr => $segment:ty) => {
+        $crate::Extend::<_, $crate::PathBuf<$segment>>::extend($root, ())
+    };
+    ($root:expr => $segment:ty => $($tail:tt)*) => {
+        $crate::path!($crate::path!($root:expr => $segment:ty) => $($tail::tt)*)
+    };
+}
+
+#[macro_export]
+macro_rules! pathref {
+    ($root:expr => $segment:ty) => {
+        $crate::Extend::<_, $crate::PathRef<$segment>>::extend(&mut $root, ())
+    };
+    ($root:expr => $segment:ty) => {
+        $crate::pathref!($crate::pathref!($root:expr => $segment:ty) => $($tail::tt)*)
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::{PathBuf as P, PathRef as R, *};
@@ -303,6 +326,24 @@ mod tests {
         drop(main_rs);
         assert_path_eq!(src, &format!("{}/{}", ROOT, SRC));
         drop(src);
+        assert_path_eq!(root, ROOT);
+    }
+
+    // Same test, but with the macro
+    #[test]
+    #[cfg(unix)]
+    fn pathref_builds_correct_paths_pathref_macro() {
+        let mut root = P::<Root>::init();
+        assert_path_eq!(root, ROOT);
+        {
+            let mut src = pathref!(root => Src);
+            assert_path_eq!(src, &format!("{}/{}", ROOT, SRC));
+            {
+                let main_rs = pathref!(src => MainRs);
+                assert_path_eq!(main_rs, &format!("{}/{}/{}", ROOT, SRC, MAIN_RS));
+            }
+            assert_path_eq!(src, &format!("{}/{}", ROOT, SRC));
+        }
         assert_path_eq!(root, ROOT);
     }
 }

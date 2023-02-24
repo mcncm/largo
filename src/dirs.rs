@@ -1,6 +1,6 @@
 pub mod proj {
     use anyhow::{anyhow, Result};
-    use typedir::{Extend, PathBuf as P, PathRef as R};
+    use typedir::{path, pathref, PathBuf as P};
 
     pub const SRC_DIR: &'static str = "src";
     pub const MAIN_FILE: &'static str = "main.tex";
@@ -28,22 +28,24 @@ pub mod proj {
         // lots of newtypes and generics and macros.
         let mut root = P::new(RootDir(()), root);
         // Project config file
-        let proj_conf: R<_> = (&mut root).extend(());
-        ConfigFile::try_create(&proj_conf, &new_proj.project_config)?;
-        drop(proj_conf);
+        {
+            let proj_conf = pathref!(root => ConfigFile);
+            ConfigFile::try_create(&proj_conf, &new_proj.project_config)?;
+        }
         // Gitignore
-        let gitignore: R<Gitignore> = (&mut root).extend(());
-        try_create(
-            &gitignore,
-            ToCreate::File(include_bytes!("files/gitignore.txt")),
-        )?;
-        drop(gitignore);
+        {
+            let gitignore = pathref!(root => Gitignore);
+            try_create(
+                &gitignore,
+                ToCreate::File(include_bytes!("files/gitignore.txt")),
+            )?;
+        }
         // Source
         {
-            let mut src_dir: R<SrcDir> = (&mut root).extend(());
+            let mut src_dir = pathref!(root => SrcDir);
             try_create(&src_dir, ToCreate::Dir)?;
             {
-                let main_file: R<MainFile> = src_dir.extend(());
+                let main_file = pathref!(src_dir => MainFile);
                 try_create(
                     &main_file,
                     ToCreate::File(include_bytes!("files/main_latex.tex")),
@@ -51,7 +53,7 @@ pub mod proj {
             }
         }
         // Build directory
-        let build_dir: R<BuildDir> = (&mut root).extend(());
+        let build_dir = path!(root => BuildDir);
         try_create(&build_dir, ToCreate::Dir)?;
         Ok(())
     }
