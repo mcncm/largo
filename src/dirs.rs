@@ -1,5 +1,6 @@
 pub mod proj {
     use anyhow::{anyhow, Result};
+    use typedir::{Extend, PathBuf as P, PathRef as R};
 
     pub const SRC_DIR: &'static str = "src";
     pub const MAIN_FILE: &'static str = "main.tex";
@@ -25,31 +26,32 @@ pub mod proj {
         // NOTE: This is *extremely* verbose without some kind of "pop-on-drop"
         // list structure. Unfortunately, that seems to be tricky to mix with
         // lots of newtypes and generics and macros.
-        use typedir::SubDir;
-        let root = RootDir(root);
+        let mut root = P::new(RootDir(()), root);
         // Project config file
-
-        let proj_conf = ConfigFile::from(root);
-        proj_conf.try_create(&new_proj.project_config)?;
-        let root = proj_conf.parent();
+        let proj_conf: R<_> = (&mut root).extend(());
+        ConfigFile::try_create(&proj_conf, &new_proj.project_config)?;
+        drop(proj_conf);
         // Gitignore
-        let gitignore = Gitignore::from(root);
+        let gitignore: R<Gitignore> = (&mut root).extend(());
         try_create(
             &gitignore,
             ToCreate::File(include_bytes!("files/gitignore.txt")),
         )?;
-        let root = gitignore.parent();
+        drop(gitignore);
         // Source
-        let src_dir = SrcDir::from(root);
-        try_create(&src_dir, ToCreate::Dir)?;
-        let main_file = MainFile::from(src_dir);
-        try_create(
-            &main_file,
-            ToCreate::File(include_bytes!("files/main_latex.tex")),
-        )?;
-        let root = main_file.parent().parent();
+        {
+            let mut src_dir: R<SrcDir> = (&mut root).extend(());
+            try_create(&src_dir, ToCreate::Dir)?;
+            {
+                let main_file: R<MainFile> = src_dir.extend(());
+                try_create(
+                    &main_file,
+                    ToCreate::File(include_bytes!("files/main_latex.tex")),
+                )?;
+            }
+        }
         // Build directory
-        let build_dir = BuildDir::from(root);
+        let build_dir: R<BuildDir> = (&mut root).extend(());
         try_create(&build_dir, ToCreate::Dir)?;
         Ok(())
     }
@@ -59,14 +61,14 @@ pub mod proj {
     }
 
     impl RootDir {
-        pub fn find() -> Result<Self> {
+        pub fn find() -> Result<P<Self>> {
             let mut path = std::env::current_dir().unwrap();
             let path_cpy = path.clone();
             loop {
                 path.push(CONFIG_FILE);
                 if path.exists() {
                     path.pop();
-                    return Ok(RootDir(path));
+                    return Ok(P::new(Self(()), path));
                 }
                 path.pop();
                 if !path.pop() {
@@ -81,8 +83,11 @@ pub mod proj {
     }
 
     impl ConfigFile {
-        fn try_create(&self, project_config: &crate::project::ProjectConfig) -> Result<()> {
-            try_create(self, ToCreate::File(&toml::ser::to_vec(&project_config)?))
+        fn try_create<P: typedir::AsPath<Self>>(
+            path: &P,
+            project_config: &crate::project::ProjectConfig,
+        ) -> Result<()> {
+            try_create(path, ToCreate::File(&toml::ser::to_vec(&project_config)?))
         }
     }
 
@@ -92,19 +97,19 @@ pub mod proj {
         File(&'a [u8]),
     }
 
-    fn try_create<N: typedir::Node>(node: &N, to_create: ToCreate) -> Result<()> {
+    fn try_create<N: typedir::Node, P: typedir::AsPath<N>>(
+        path: &P,
+        to_create: ToCreate,
+    ) -> Result<()> {
         use std::io::Write;
         match to_create {
-            ToCreate::Dir => std::fs::create_dir(node.as_ref())?,
+            ToCreate::Dir => std::fs::create_dir(&path)?,
             ToCreate::File(contents) => {
                 // FIXME race condition! TOC/TOU! Not good!
-                if node.as_ref().exists() {
-                    return Err(anyhow!(
-                        "file already exists: `{}`",
-                        node.as_ref().display()
-                    ));
+                if path.exists() {
+                    return Err(anyhow!("file already exists: `{}`", path.display()));
                 }
-                let mut f = std::fs::File::create(node.as_ref())?;
+                let mut f = std::fs::File::create(&path)?;
                 f.write_all(contents)?;
             }
         }
@@ -113,52 +118,53 @@ pub mod proj {
 }
 
 pub mod conf {
-    use anyhow::{anyhow, Error, Result};
+    use anyhow::{anyhow, Result};
     use std::path::PathBuf;
+    use typedir::{AsPath, Extend, PathBuf as P};
 
     pub const CONFIG_DIR: &'static str = ".largo";
     pub const CONFIG_FILE: &'static str = "config.toml";
 
-    // The directory that the
-    #[allow(dead_code)]
-    fn home_directory() -> Result<PathBuf> {
-        // This if/else chain should optimize away, it's guaranteed to be exhaustive
-        // (unlike `#[cfg(...)]`), and rust-analyzer won't ignore the dead cases.
-        if cfg!(target_family = "unix") {
-            Ok(PathBuf::from(std::env::var("HOME")?))
-        } else if cfg!(target_family = "windows") {
-            Ok(PathBuf::from(std::env::var("USERPROFILE")?))
-        } else {
-            // The only other `target_family` at this time is `wasm`.
-            unreachable!("target unsupported");
-        }
+    typedir::typedir! {
+        node HomeDir {
+            CONFIG_DIR => node ConfigDir {
+                CONFIG_FILE => node ConfigFile;
+            };
+        };
     }
 
-    typedir::typedir! {
-        node ConfigDir {
-            CONFIG_FILE => node ConfigFile;
-        };
+    impl HomeDir {
+        /// NOTE: Intentionally not globally visible!
+        fn try_get() -> Result<P<Self>> {
+            // This if/else chain should optimize away, it's guaranteed to be exhaustive
+            // (unlike `#[cfg(...)]`), and rust-analyzer won't ignore the dead cases.
+            let path = if cfg!(target_family = "unix") {
+                PathBuf::from(std::env::var("HOME")?)
+            } else if cfg!(target_family = "windows") {
+                PathBuf::from(std::env::var("USERPROFILE")?)
+            } else {
+                // The only other `target_family` at this time is `wasm`.
+                unreachable!("target unsupported");
+            };
+            Ok(P::new(HomeDir(()), path))
+        }
     }
 
     impl ConfigDir {
         #[allow(dead_code)]
-        pub fn global_config() -> Result<Self> {
-            let mut path = home_directory()?;
-            path.push(CONFIG_DIR);
-            Ok(Self(path))
+        pub fn global_config() -> Result<P<Self>> {
+            let home = HomeDir::try_get()?;
+            Ok(home.extend(()))
         }
     }
 
     #[derive(Debug)]
     pub struct ConfigFileSource(config::File<config::FileSourceFile, config::FileFormat>);
 
-    impl<'a> TryFrom<&'a ConfigFile> for ConfigFileSource {
-        type Error = Error;
-
-        fn try_from(path: &'a ConfigFile) -> Result<Self> {
+    impl ConfigFileSource {
+        pub fn try_from_path<P: AsPath<ConfigFile>>(path: &P) -> Result<Self> {
             let source = config::File::new(
-                path.as_ref()
-                    .to_str()
+                path.to_str()
                     .ok_or(anyhow!("failed to convert config file path to string"))?,
                 config::FileFormat::Toml,
             );

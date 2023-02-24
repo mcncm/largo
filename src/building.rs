@@ -3,6 +3,8 @@ use std::ffi::OsStr;
 
 use anyhow::{anyhow, Result};
 
+use typedir::{Extend, PathBuf as P, PathRef as R};
+
 use crate::conf::{self, LargoConfig};
 use crate::dirs;
 use crate::project::{self, Dependencies, Project, ProjectSettings, SystemSettings};
@@ -134,7 +136,7 @@ impl<'a> BuildBuilder<'a> {
 /// received
 struct BuildSettings<'a> {
     pub conf: &'a LargoConfig,
-    pub root_dir: dirs::proj::RootDir,
+    pub root_dir: P<dirs::proj::RootDir>,
     pub profile_name: &'a str,
     pub system_settings: SystemSettings,
     pub project_settings: ProjectSettings,
@@ -158,14 +160,14 @@ impl<'a> BuildSettings<'a> {
         BuildVars::new().with_dependencies(&self.dependencies)
     }
 
-    fn build_command(self) -> std::process::Command {
-        use typedir::SubDir;
+    fn build_command(mut self) -> std::process::Command {
         let tex_input = tex_input(&self.profile_name, self.conf);
         let build_vars = self.build_vars();
         let mut cmd = std::process::Command::new(self.executable());
-        let src_dir = dirs::proj::SrcDir::from(self.root_dir);
-        cmd.current_dir(&src_dir);
-        let root_dir = src_dir.parent();
+        {
+            let src_dir: R<dirs::proj::SrcDir> = (&mut self.root_dir).extend(());
+            cmd.current_dir(src_dir);
+        }
         for (var, val) in build_vars.0 {
             cmd.env(var, val);
         }
@@ -181,6 +183,7 @@ impl<'a> BuildSettings<'a> {
         };
         use clam::Options;
         pdflatex_options.apply(&mut cmd);
+        let build_dir: P<dirs::proj::BuildDir> = self.root_dir.extend(());
         match &self.project_settings.shell_escape {
             Some(true) => cmd.arg("-shell-escape"),
             Some(false) => cmd.arg("-no-shell-escape"),
@@ -189,10 +192,7 @@ impl<'a> BuildSettings<'a> {
         }
         .args([
             "-output-directory",
-            dirs::proj::BuildDir::from(root_dir)
-                .as_ref()
-                .to_str()
-                .expect("some kind of non-utf8 path"),
+            build_dir.to_str().expect("some kind of non-utf8 path"),
         ])
         .arg(&tex_input);
         cmd

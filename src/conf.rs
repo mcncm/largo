@@ -68,11 +68,13 @@ impl LargoConfig {
         // }
 
         // Fall back on a *global* config
+        use typedir::Extend;
         let config_dir = dirs::conf::ConfigDir::global_config()?;
-        let config_file = dirs::conf::ConfigFile::from(config_dir);
+        let config_file: typedir::PathBuf<dirs::conf::ConfigFile> = config_dir.extend(());
         // FIXME: race condition!
         if config_file.as_ref().exists() {
-            builder = builder.add_source(dirs::conf::ConfigFileSource::try_from(&config_file)?);
+            builder =
+                builder.add_source(dirs::conf::ConfigFileSource::try_from_path(&config_file)?);
         }
         Ok(builder.build()?.try_deserialize()?)
     }

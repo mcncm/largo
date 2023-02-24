@@ -3,11 +3,11 @@ use std::collections::BTreeMap;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::{dirs, options};
+use crate::{dirs, options, prelude::*};
 
 #[derive(Debug)]
 pub struct Project {
-    pub root: dirs::proj::RootDir,
+    pub root: typedir::PathBuf<dirs::proj::RootDir>,
     pub config: ProjectConfig,
 }
 
@@ -110,22 +110,18 @@ pub enum Dependency {
 
 impl Project {
     pub fn find() -> Result<Self> {
-        use typedir::SubDir;
-        let root = dirs::proj::RootDir::find()?;
-        let path = dirs::proj::ConfigFile::from(root);
-        let conf: ProjectConfig = config::Config::builder()
-            .add_source(config::File::new(
-                path.as_ref()
-                    .as_os_str()
-                    .to_str()
-                    .expect("non-UTF-8 path or something"),
-                config::FileFormat::Toml,
-            ))
-            .build()?
-            .try_deserialize()?;
-        Ok(Self {
-            root: path.parent(),
-            config: conf,
-        })
+        use dirs::proj::*;
+        let mut root = RootDir::find()?;
+        let conf: ProjectConfig = {
+            let path: Pr<ConfigFile> = (&mut root).extend(());
+            config::Config::builder()
+                .add_source(config::File::new(
+                    path.to_str().expect("non-UTF-8 path or something"),
+                    config::FileFormat::Toml,
+                ))
+                .build()?
+                .try_deserialize()?
+        };
+        Ok(Self { root, config: conf })
     }
 }
