@@ -31,6 +31,11 @@ pub mod proj {
         // list structure. Unfortunately, that seems to be tricky to mix with
         // lots of newtypes and generics and macros.
         let mut root = P::new(RootDir(()), root);
+        // Init git
+        std::process::Command::new("git")
+            .arg("init")
+            .arg(root.as_os_str())
+            .output()?;
         // Project config file
         {
             let proj_conf = pathref!(root => ConfigFile);
@@ -43,14 +48,6 @@ pub mod proj {
                 &gitignore,
                 ToCreate::File(include_bytes!("files/gitignore.txt")),
             )?;
-        }
-        // Git directory
-        {
-            let git_dir = pathref!(root => GitDir);
-            std::process::Command::new("git")
-                .arg("init")
-                .arg(git_dir.as_os_str())
-                .output()?;
         }
         // Source
         {
