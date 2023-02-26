@@ -31,15 +31,38 @@ pub struct ProjectConfigHead {
     pub system_settings: SystemSettings,
 }
 
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub struct ProfileName(String);
+
+impl AsRef<str> for ProfileName {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for ProfileName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl TryFrom<String> for ProfileName {
+    type Error = anyhow::Error;
+
+    fn try_from(s: String) -> std::result::Result<Self, Self::Error> {
+        Ok(Self(s))
+    }
+}
+
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct Profiles(BTreeMap<String, Profile>);
+pub struct Profiles(BTreeMap<ProfileName, Profile>);
 
 impl Profiles {
     pub fn new() -> Profiles {
         Self(BTreeMap::new())
     }
 
-    pub fn select_profile(mut self, name: &str) -> Option<Profile> {
+    pub fn select_profile(mut self, name: &ProfileName) -> Option<Profile> {
         self.0.remove(name)
     }
 }

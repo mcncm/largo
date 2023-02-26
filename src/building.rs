@@ -23,9 +23,9 @@ impl AsRef<OsStr> for TexInput {
 struct LargoVars<'a>(std::collections::BTreeMap<&'static str, &'a str>);
 
 impl<'a> LargoVars<'a> {
-    fn new(profile_name: &'a str, conf: &'a LargoConfig) -> Self {
+    fn new(profile_name: &'a project::ProfileName, conf: &'a LargoConfig) -> Self {
         let mut vars = std::collections::BTreeMap::new();
-        vars.insert("Profile", profile_name);
+        vars.insert("Profile", profile_name.as_ref());
         if let Some(bib) = conf.default_bibliography.as_ref() {
             vars.insert("Biblio", bib);
         }
@@ -43,7 +43,7 @@ impl<'a> LargoVars<'a> {
 }
 
 // TODO Other TeX vars: `\X:OUTPUTDIR`
-fn tex_input(profile_name: &str, conf: &LargoConfig) -> TexInput {
+fn tex_input(profile_name: &project::ProfileName, conf: &LargoConfig) -> TexInput {
     let vars = LargoVars::new(profile_name, conf);
     let vars = vars.to_defs();
     let main_file = dirs::proj::MAIN_FILE;
@@ -82,7 +82,7 @@ pub struct BuildBuilder<'a> {
     conf: &'a LargoConfig,
     project: Project,
     /// Which profile to build in
-    profile_name: Option<&'a str>,
+    profile_name: Option<&'a crate::project::ProfileName>,
 }
 
 impl<'a> BuildBuilder<'a> {
@@ -94,8 +94,8 @@ impl<'a> BuildBuilder<'a> {
         }
     }
 
-    pub fn with_profile_name(mut self, name: &'a Option<String>) -> Self {
-        self.profile_name = name.as_ref().map(|x| x.as_str());
+    pub fn with_profile_name(mut self, name: &'a Option<crate::project::ProfileName>) -> Self {
+        self.profile_name = name.as_ref();
         self
     }
 
@@ -104,9 +104,7 @@ impl<'a> BuildBuilder<'a> {
         let conf = self.conf;
         let project = self.project;
         let root_dir = project.root;
-        let profile_name = self
-            .profile_name
-            .unwrap_or(self.conf.default_profile.as_str());
+        let profile_name = self.profile_name.unwrap_or(&self.conf.default_profile);
         // FIXME This is a bug: there should *always* be a default profile to select
         let profiles = project.config.profiles;
         let profile = profiles
@@ -137,7 +135,7 @@ impl<'a> BuildBuilder<'a> {
 struct BuildSettings<'a> {
     pub conf: &'a LargoConfig,
     pub root_dir: P<dirs::proj::RootDir>,
-    pub profile_name: &'a str,
+    pub profile_name: &'a project::ProfileName,
     pub system_settings: SystemSettings,
     pub project_settings: ProjectSettings,
     pub dependencies: Dependencies,

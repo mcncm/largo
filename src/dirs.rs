@@ -17,7 +17,7 @@ pub mod proj {
                 MAIN_FILE => node MainFile;
             };
             BUILD_DIR => node BuildDir {
-                forall s: &str, s => node ProfileBuildDir;
+                forall s: &crate::project::ProfileName, s.as_ref() => node ProfileBuildDir;
             };
             GITIGNORE => node Gitignore;
         };

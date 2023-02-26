@@ -126,8 +126,12 @@ impl BuildSubcommand {
         project: project::Project,
         conf: &LargoConfig,
     ) -> Result<largo::building::Build> {
+        let profile = match self.profile {
+            Some(p) => Some(p.try_into()?),
+            None => None,
+        };
         largo::building::BuildBuilder::new(conf, project)
-            .with_profile_name(&self.profile)
+            .with_profile_name(&profile)
             .try_finish()
     }
 }
@@ -145,9 +149,10 @@ impl ProjectSubcommand {
                 let build_dir = typedir::path!(root => dirs::proj::BuildDir);
                 match profile {
                     Some(profile) => {
+                        let profile: crate::project::ProfileName = profile.try_into()?;
                         use typedir::Extend;
                         let profile_dir: typedir::PathBuf<dirs::proj::ProfileBuildDir> =
-                            build_dir.extend(profile.as_str());
+                            build_dir.extend(&profile);
                         std::fs::remove_dir_all(&profile_dir)?;
                     }
                     None => {

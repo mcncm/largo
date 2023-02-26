@@ -34,7 +34,7 @@ pub struct LargoConfig {
     pub lualatex_executable: Executable,
     pub biber_executable: Executable,
     /// The default profile selected if no other profile is chosen.
-    pub default_profile: String,
+    pub default_profile: crate::project::ProfileName,
     /// The default TeX format
     pub default_tex_format: crate::options::TexFormat,
     /// The default TeX engine
