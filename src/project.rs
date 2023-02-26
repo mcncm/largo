@@ -108,8 +108,31 @@ impl ProjectSettings {
     }
 }
 
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub struct DependencyName(String);
+
+impl AsRef<str> for DependencyName {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for DependencyName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl TryFrom<String> for DependencyName {
+    type Error = anyhow::Error;
+
+    fn try_from(s: String) -> std::result::Result<Self, Self::Error> {
+        Ok(Self(s))
+    }
+}
+
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct Dependencies(BTreeMap<String, Dependency>);
+pub struct Dependencies(BTreeMap<DependencyName, Dependency>);
 
 impl Dependencies {
     pub fn new() -> Self {
@@ -118,9 +141,9 @@ impl Dependencies {
 }
 
 impl<'a> IntoIterator for &'a Dependencies {
-    type Item = <&'a BTreeMap<String, Dependency> as IntoIterator>::Item;
+    type Item = <&'a BTreeMap<DependencyName, Dependency> as IntoIterator>::Item;
 
-    type IntoIter = <&'a BTreeMap<String, Dependency> as IntoIterator>::IntoIter;
+    type IntoIter = <&'a BTreeMap<DependencyName, Dependency> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         (&self.0).into_iter()
