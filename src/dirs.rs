@@ -16,7 +16,9 @@ pub mod proj {
             SRC_DIR => node SrcDir {
                 MAIN_FILE => node MainFile;
             };
-            BUILD_DIR => node BuildDir;
+            BUILD_DIR => node BuildDir {
+                forall s: &str, s => node ProfileBuildDir;
+            };
             GITIGNORE => node Gitignore;
         };
     }

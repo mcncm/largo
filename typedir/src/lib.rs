@@ -17,7 +17,7 @@ pub trait Link {}
 impl<T> Link for T {}
 
 pub trait Child<P: Node, L: Link>: Node {
-    fn link<'a>(l: &'a L) -> &'a str;
+    fn link<'a>(l: &'a L) -> &'a std::path::Path;
 }
 
 pub trait Extend<L: Link, T>: __sealed::Extend<L, T> {
@@ -204,7 +204,21 @@ macro_rules! __parent_ctx {
         $crate::typedir!(node $Name;);
 
         impl $crate::Child<$Parent, ()> for $Name {
-            fn link(_: &()) -> &'static str { $link }
+            fn link(_: &()) -> &::std::path::Path { ($link).as_ref() }
+        }
+
+        // Children have *this* node as parent
+        $crate::__parent_ctx!($Name / $($($subdirs)*)?);
+
+        // Continue in the tail with the same parent context
+        $crate::__parent_ctx!($Parent / $($tail)*);
+    };
+    ($Parent:ident / forall $x:ident : $type:ty , $e:expr => node $Name:ident $({$($subdirs:tt)*})?; $($tail:tt)*) => {
+
+        $crate::typedir!(node $Name;);
+
+        impl $crate::Child<$Parent, $type> for $Name {
+            fn link<'a>($x: &'a $type) -> &'a ::std::path::Path { ($e).as_ref() }
         }
 
         // Children have *this* node as parent
@@ -253,7 +267,7 @@ macro_rules! pathref {
     ($root:expr => $segment:ty) => {
         $crate::Extend::<_, $crate::PathRef<$segment>>::extend(&mut $root, ())
     };
-    ($root:expr => $segment:ty) => {
+    ($root:expr => $segment:ty => $($tail:tt)*) => {
         $crate::pathref!($crate::pathref!($root:expr => $segment:ty) => $($tail::tt)*)
     };
 }
@@ -268,10 +282,8 @@ mod tests {
 
         pub const ROOT: &'static str = "/my/root/path";
         pub const SRC: &'static str = "src";
-        pub const MAIN_RS: &'static str = "src";
+        pub const MAIN_RS: &'static str = "main.rs";
         pub const TARGET: &'static str = "target";
-        pub const DEBUG: &'static str = "debug";
-        pub const RELEASE: &'static str = "release";
 
         typedir! {
             node Root {
@@ -279,8 +291,7 @@ mod tests {
                     MAIN_RS => node MainRs;
                 };
                 TARGET => node Target {
-                    DEBUG => node Debug;
-                    RELEASE => node Release;
+                    forall s: &str, s => node Profile;
                 };
             };
         }
@@ -345,5 +356,15 @@ mod tests {
             assert_path_eq!(src, &format!("{}/{}", ROOT, SRC));
         }
         assert_path_eq!(root, ROOT);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn simple_parametric_paths_work() {
+        let root = P::<Root>::init();
+        let target = path!(root => Target);
+        // No macro for this yet
+        let profile: P<Profile> = target.extend("someprofile");
+        assert_path_eq!(profile, &format!("{}/{}/{}", ROOT, TARGET, "someprofile"));
     }
 }

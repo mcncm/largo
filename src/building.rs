@@ -183,7 +183,9 @@ impl<'a> BuildSettings<'a> {
         };
         use clam::Options;
         pdflatex_options.apply(&mut cmd);
-        let build_dir: P<dirs::proj::BuildDir> = self.root_dir.extend(());
+        let build_dir: P<dirs::proj::ProfileBuildDir> =
+            self.root_dir.extend(()).extend(self.profile_name);
+        std::fs::create_dir_all(&build_dir).expect("TODO: Sorry, this code needs to be refactored; it's a waste of time to handle this error.");
         match &self.project_settings.shell_escape {
             Some(true) => cmd.arg("-shell-escape"),
             Some(false) => cmd.arg("-no-shell-escape"),

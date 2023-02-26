@@ -39,7 +39,10 @@ enum ProjectSubcommand {
     /// Build the current project
     Build(BuildSubcommand),
     /// Erase the build directory
-    Clean,
+    Clean {
+        #[arg(long)]
+        profile: Option<String>,
+    },
     /// Generate a standalone TeX project
     Eject,
     #[cfg(debug_assertions)]
@@ -134,14 +137,23 @@ impl ProjectSubcommand {
         use ProjectSubcommand::*;
         match self {
             Build(subcmd) => subcmd.try_into_build(project, conf)?.run(),
-            // the `Project` is reasonable proof that it is a valid project:
+            // the `Project` is (reasonable) proof that it is a valid project:
             // the manifest file parses. It's *reasonably* safe to delete a
             // directory if `proj` is constructed.
-            Clean => {
+            Clean { profile } => {
                 let root = project.root;
                 let build_dir = typedir::path!(root => dirs::proj::BuildDir);
-                std::fs::remove_dir_all(&build_dir.as_ref())?;
-                std::fs::create_dir(&build_dir.as_ref())?;
+                match profile {
+                    Some(profile) => {
+                        use typedir::Extend;
+                        let profile_dir: typedir::PathBuf<dirs::proj::ProfileBuildDir> =
+                            build_dir.extend(profile.as_str());
+                        std::fs::remove_dir_all(&profile_dir)?;
+                    }
+                    None => {
+                        std::fs::remove_dir_all(&build_dir)?;
+                    }
+                }
                 Ok(())
             }
             Eject => todo!(),
