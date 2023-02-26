@@ -8,6 +8,7 @@ pub mod proj {
     pub const CONFIG_FILE: &'static str = "largo.toml";
     pub const LOCK_FILE: &'static str = "largo.lock";
     pub const GITIGNORE: &'static str = ".gitignore";
+    pub const GIT_DIR: &'static str = ".git";
 
     typedir::typedir! {
         node RootDir {
@@ -19,6 +20,7 @@ pub mod proj {
             BUILD_DIR => node BuildDir {
                 forall s: &crate::project::ProfileName, s.as_ref() => node ProfileBuildDir;
             };
+            GIT_DIR => node GitDir;
             GITIGNORE => node Gitignore;
         };
     }
@@ -41,6 +43,14 @@ pub mod proj {
                 &gitignore,
                 ToCreate::File(include_bytes!("files/gitignore.txt")),
             )?;
+        }
+        // Git directory
+        {
+            let git_dir = pathref!(root => GitDir);
+            std::process::Command::new("git")
+                .arg("init")
+                .arg(git_dir.as_os_str())
+                .output()?;
         }
         // Source
         {
