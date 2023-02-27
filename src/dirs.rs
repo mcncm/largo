@@ -44,10 +44,7 @@ pub mod proj {
         // Gitignore
         {
             let gitignore = pathref!(root => Gitignore);
-            try_create(
-                &gitignore,
-                ToCreate::File(include_bytes!("files/gitignore.txt")),
-            )?;
+            try_create(&gitignore, ToCreate::File(crate::files::GITIGNORE))?;
         }
         // Source
         {
@@ -55,10 +52,7 @@ pub mod proj {
             try_create(&src_dir, ToCreate::Dir)?;
             {
                 let main_file = pathref!(src_dir => MainFile);
-                try_create(
-                    &main_file,
-                    ToCreate::File(include_bytes!("files/main_latex.tex")),
-                )?;
+                try_create(&main_file, ToCreate::File(crate::files::MAIN_LATEX))?;
             }
         }
         // Build directory
