@@ -92,9 +92,9 @@ pub struct ProjectSettings {
 impl SystemSettings {
     pub fn merge(self, other: Self) -> Self {
         Self {
-            tex_format: self.tex_format.and(other.tex_format),
-            tex_engine: self.tex_engine.and(other.tex_engine),
-            bib_engine: self.bib_engine.and(other.bib_engine),
+            tex_format: self.tex_format.or(other.tex_format),
+            tex_engine: self.tex_engine.or(other.tex_engine),
+            bib_engine: self.bib_engine.or(other.bib_engine),
         }
     }
 }
@@ -102,8 +102,8 @@ impl SystemSettings {
 impl ProjectSettings {
     pub fn merge(self, other: Self) -> Self {
         Self {
-            output_format: self.output_format.and(other.output_format),
-            shell_escape: self.shell_escape.and(other.shell_escape),
+            output_format: self.output_format.or(other.output_format),
+            shell_escape: self.shell_escape.or(other.shell_escape),
         }
     }
 }
