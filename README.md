@@ -68,6 +68,8 @@ where `debug` is the default _build profile_ selected by Largo.
 Largo passes some information about the build to the TeX engine. This information is exposed through a set of Largo user macros:
 
 * `\LargoProfile`: the build profile, _e.g._ `debug` in the example above. This is particularly useful for conditional compilation.
+* `\LargoOutputDirectory`: the build directory, _e.g._ `./build/debug/` in the example above.
+* `\LargoBibliography`: the global bibliography, if it is configured in `.largo/config.toml`.
 
 ## Settings and configuration
 ### Project settings

@@ -3,11 +3,12 @@ use std::ffi::OsStr;
 
 use anyhow::{anyhow, Result};
 
+use thiserror::__private::PathAsDisplay;
 use typedir::{Extend, PathBuf as P, PathRef as R};
 
 use crate::conf::{self, LargoConfig};
 use crate::dirs;
-use crate::project::{self, Dependencies, Project, ProjectSettings, SystemSettings};
+use crate::project::{self, Dependencies, ProfileName, Project, ProjectSettings, SystemSettings};
 
 struct TexInput(String);
 
@@ -18,34 +19,48 @@ impl AsRef<OsStr> for TexInput {
 }
 
 /// Variables available at TeX run time
-// FIXME: this implementation is very, very suboptimal. It's particularly bad
-// for documentation for the keys to be dynamic.
-struct LargoVars<'a>(std::collections::BTreeMap<&'static str, &'a str>);
+#[derive(Debug)]
+struct LargoVars<'a> {
+    profile: &'a ProfileName,
+    bibliography: &'a Option<String>,
+    output_directory: P<dirs::proj::ProfileBuildDir>,
+}
+
+// For use in `LargoVars::to_defs`
+macro_rules! write_lv {
+    ($defs:expr, $var:expr, $val:expr) => {
+        write!($defs, r#"\def\Largo{}{{{}}}"#, $var, $val).expect("internal error");
+    };
+}
 
 impl<'a> LargoVars<'a> {
-    fn new(profile_name: &'a project::ProfileName, conf: &'a LargoConfig) -> Self {
-        let mut vars = std::collections::BTreeMap::new();
-        vars.insert("Profile", profile_name.as_ref());
-        if let Some(bib) = conf.default_bibliography.as_ref() {
-            vars.insert("Biblio", bib);
+    fn from_build_settings(settings: &'a BuildSettings<'a>) -> Self {
+        // NOTE: unfortunate clone
+        let root_dir = settings.root_dir.clone();
+        Self {
+            profile: &settings.profile_name,
+            bibliography: &settings.conf.default_bibliography,
+            output_directory: root_dir.extend(()).extend(settings.profile_name),
         }
-        Self(vars)
     }
 
     fn to_defs(self) -> String {
         use std::fmt::Write;
         let mut defs = String::new();
-        for (k, v) in self.0.into_iter() {
-            write!(&mut defs, r#"\def\Largo{k}{{{v}}}"#).unwrap();
+        {
+            let defs = &mut defs;
+            write_lv!(defs, "Profile", &self.profile);
+            if let Some(bib) = self.bibliography {
+                write_lv!(defs, "Bibliography", bib);
+            }
+            write_lv!(defs, "OutputDirectory", &self.output_directory.as_display());
         }
         defs
     }
 }
 
-// TODO Other TeX vars: `\X:OUTPUTDIR`
-fn tex_input(profile_name: &project::ProfileName, conf: &LargoConfig) -> TexInput {
-    let vars = LargoVars::new(profile_name, conf);
-    let vars = vars.to_defs();
+fn tex_input(largo_vars: LargoVars, _conf: &LargoConfig) -> TexInput {
+    let vars = largo_vars.to_defs();
     let main_file = dirs::proj::MAIN_FILE;
     TexInput(format!(r#"{vars}\input{{{main_file}}}"#))
 }
@@ -135,7 +150,7 @@ impl<'a> BuildBuilder<'a> {
 struct BuildSettings<'a> {
     pub conf: &'a LargoConfig,
     pub root_dir: P<dirs::proj::RootDir>,
-    pub profile_name: &'a project::ProfileName,
+    pub profile_name: &'a ProfileName,
     pub system_settings: SystemSettings,
     pub project_settings: ProjectSettings,
     pub dependencies: Dependencies,
@@ -159,7 +174,8 @@ impl<'a> BuildSettings<'a> {
     }
 
     fn build_command(mut self) -> std::process::Command {
-        let tex_input = tex_input(&self.profile_name, self.conf);
+        let largo_vars = LargoVars::from_build_settings(&self);
+        let tex_input = tex_input(largo_vars, self.conf);
         let build_vars = self.build_vars();
         let mut cmd = std::process::Command::new(self.executable());
         {

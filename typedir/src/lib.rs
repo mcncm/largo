@@ -25,7 +25,7 @@ pub trait Extend<L: Link, T>: __sealed::Extend<L, T> {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PathBuf<N: Node> {
     path: std::path::PathBuf,
     m: PhantomData<N>,
