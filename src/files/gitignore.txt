@@ -1,7 +1,7 @@
 # Your .gitignore here
 
 # largo-specific files and directories
-target/
+build/
 
 ########################################################################
 # The remaininder of this file is the Github TeX `.gitignore` found at #
