@@ -98,6 +98,9 @@ struct BuildSubcommand {
     #[arg(short = 'p', long)]
     /// Overrides the default build profile if set
     profile: Option<String>,
+    /// Print output from TeX engine
+    #[arg(short = 'v', long)]
+    verbose: bool,
 }
 
 impl InitSubcommand {
@@ -147,12 +150,19 @@ impl BuildSubcommand {
         project: project::Project,
         conf: &LargoConfig,
     ) -> Result<largo::building::Build> {
+        use largo::building;
         let profile = match self.profile {
             Some(p) => Some(p.try_into()?),
             None => None,
         };
-        largo::building::BuildBuilder::new(conf, project)
+        let verbosity = if self.verbose {
+            building::Verbosity::Noisy
+        } else {
+            building::Verbosity::Silent
+        };
+        building::BuildBuilder::new(conf, project)
             .with_profile_name(&profile)
+            .with_verbosity(verbosity)
             .try_finish()
     }
 }

@@ -93,9 +93,27 @@ impl BuildVars {
     }
 }
 
+/// Level of severity of information to forward from TeX engine
+pub enum LogLevel {
+    Warning,
+    Error,
+}
+
+#[derive(Default)]
+pub enum Verbosity {
+    /// Never emit anything, even on failure
+    #[default]
+    Silent,
+    /// Only forward TeX engine warnings, errors
+    Info(LogLevel),
+    /// Forward all TeX engine output
+    Noisy,
+}
+
 pub struct BuildBuilder<'a> {
     conf: &'a LargoConfig,
     project: Project,
+    verbosity: Verbosity,
     /// Which profile to build in
     profile_name: Option<&'a crate::project::ProfileName>,
 }
@@ -105,12 +123,18 @@ impl<'a> BuildBuilder<'a> {
         Self {
             conf,
             project,
+            verbosity: Verbosity::Silent,
             profile_name: None,
         }
     }
 
     pub fn with_profile_name(mut self, name: &'a Option<crate::project::ProfileName>) -> Self {
         self.profile_name = name.as_ref();
+        self
+    }
+
+    pub fn with_verbosity(mut self, verbosity: Verbosity) -> Self {
+        self.verbosity = verbosity;
         self
     }
 
@@ -136,6 +160,7 @@ impl<'a> BuildBuilder<'a> {
             system_settings,
             project_settings,
             dependencies,
+            verbosity: self.verbosity,
         })
     }
 
@@ -148,12 +173,13 @@ impl<'a> BuildBuilder<'a> {
 /// An intermediate state of unpackaging and treating all the data we've
 /// received
 struct BuildSettings<'a> {
-    pub conf: &'a LargoConfig,
-    pub root_dir: P<dirs::proj::RootDir>,
-    pub profile_name: &'a ProfileName,
-    pub system_settings: SystemSettings,
-    pub project_settings: ProjectSettings,
-    pub dependencies: Dependencies,
+    conf: &'a LargoConfig,
+    root_dir: P<dirs::proj::RootDir>,
+    profile_name: &'a ProfileName,
+    system_settings: SystemSettings,
+    project_settings: ProjectSettings,
+    dependencies: Dependencies,
+    verbosity: Verbosity,
 }
 
 impl<'a> BuildSettings<'a> {
@@ -174,10 +200,14 @@ impl<'a> BuildSettings<'a> {
     }
 
     fn build_command(mut self) -> std::process::Command {
+        use std::process;
         let largo_vars = LargoVars::from_build_settings(&self);
         let tex_input = tex_input(largo_vars, self.conf);
         let build_vars = self.build_vars();
         let mut cmd = std::process::Command::new(self.executable());
+        if !matches!(self.verbosity, Verbosity::Noisy) {
+            cmd.stdout(process::Stdio::null());
+        }
         {
             let src_dir: R<dirs::proj::SrcDir> = (&mut self.root_dir).extend(());
             cmd.current_dir(src_dir);
@@ -228,7 +258,8 @@ pub struct Build {
 
 impl Build {
     pub fn run(mut self) -> Result<()> {
-        self.shell_cmd.output()?;
+        let mut child = self.shell_cmd.spawn()?;
+        child.wait()?;
         Ok(())
     }
 }
