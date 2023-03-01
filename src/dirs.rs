@@ -1,5 +1,5 @@
 pub mod proj {
-    use crate::{files, project};
+    use crate::project;
     use anyhow::{anyhow, Result};
     use typedir::{path, pathref, PathBuf as P, PathRef as R};
 
@@ -66,11 +66,25 @@ pub mod proj {
         fn try_create_src_file(&self, src_dir: &mut R<SrcDir>) -> Result<()> {
             use typedir::Extend;
             match self.kind {
-                ProjectKind::Package => todo!(),
-                ProjectKind::Class => todo!(),
+                ProjectKind::Package => {
+                    let src_file: R<SrcFile> = src_dir.extend("main.sty");
+                    let template = crate::files::packages::PackageTemplate::new(&self.name.into());
+                    try_create(
+                        &src_file,
+                        ToCreate::File(format!("{}", template).as_bytes()),
+                    )
+                }
+                ProjectKind::Class => {
+                    let src_file: R<SrcFile> = src_dir.extend("main.cls");
+                    let template = crate::files::packages::ClassTemplate::new(&self.name.into());
+                    try_create(
+                        &src_file,
+                        ToCreate::File(format!("{}", template).as_bytes()),
+                    )
+                }
                 ProjectKind::Document => {
                     let src_file: R<SrcFile> = src_dir.extend("main.tex");
-                    try_create(&src_file, ToCreate::File(crate::files::GITIGNORE))
+                    try_create(&src_file, ToCreate::File(crate::files::MAIN_LATEX))
                 }
             }
         }

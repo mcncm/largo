@@ -168,7 +168,7 @@ impl<'a> TemplateKind for PackageTemplate<'a> {
 }
 
 impl<'a> PackageTemplate<'a> {
-    fn new(name: &PackageName<'a>) -> Self {
+    pub fn new(name: &PackageName<'a>) -> Self {
         Self(TemplateData::new(name))
     }
 }
@@ -186,7 +186,7 @@ impl<'a> TemplateKind for ClassTemplate<'a> {
 }
 
 impl<'a> ClassTemplate<'a> {
-    fn new(name: &PackageName<'a>) -> Self {
+    pub fn new(name: &PackageName<'a>) -> Self {
         Self(TemplateData::new(name))
     }
 }
