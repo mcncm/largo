@@ -208,6 +208,18 @@ impl<'a> BuildSettings<'a> {
         if !matches!(self.verbosity, Verbosity::Noisy) {
             cmd.stdout(process::Stdio::null());
         }
+        match &self.verbosity {
+            Verbosity::Silent => {
+                cmd.stdout(process::Stdio::null());
+            }
+            Verbosity::Info(_LogLevel) => {
+                // What do we do here? Custom pipe?
+                todo!();
+            }
+            Verbosity::Noisy => {
+                // Don't have to do anything, inheriting stdout
+            }
+        }
         {
             let src_dir: R<dirs::proj::SrcDir> = (&mut self.root_dir).extend(());
             cmd.current_dir(src_dir);
@@ -225,6 +237,8 @@ impl<'a> BuildSettings<'a> {
             }
             None => (),
         };
+        // Always use nonstop mode for now.
+        pdflatex_options.interaction = Some(crate::engines::pdflatex::InteractionMode::NonStopMode);
         use clam::Options;
         pdflatex_options.apply(&mut cmd);
         let build_dir: P<dirs::proj::ProfileBuildDir> =

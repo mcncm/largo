@@ -79,15 +79,15 @@ pub fn generate_code(options_data: model::OptionsData) -> Result<proc_macro2::To
 fn emit_field(ctx: &LoweringCtx, field: model::OptionsField) -> proc_macro2::TokenStream {
     use syn::spanned::Spanned;
     let orig_name = match field.ident {
-        Some(ident) => Ok(ident.to_string()),
+        Some(ident) => Ok(ident),
         None => Err(Error::new(field.ident.span(), "unnamed field")),
     }
     .expect("FIXME: unnamed field; this is actually an internal macro bug");
     let new_name = match field.rename {
         Some(model::Rename(name)) => name,
-        None => (ctx.convert_case)(&orig_name),
+        None => (ctx.convert_case)(&orig_name.to_string()),
     };
     quote! {
-        clam::ArgValue::set_cmd_arg(#new_name, #orig_name, cmd);
+        clam::ArgValue::set_cmd_arg(&self.#orig_name, #new_name, cmd);
     }
 }

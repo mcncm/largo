@@ -149,18 +149,18 @@ impl BuildSubcommand {
         self,
         project: project::Project,
         conf: &LargoConfig,
-    ) -> Result<largo::building::Build> {
-        use largo::building;
+    ) -> Result<largo::build::Build> {
+        use largo::build;
         let profile = match self.profile {
             Some(p) => Some(p.try_into()?),
             None => None,
         };
         let verbosity = if self.verbose {
-            building::Verbosity::Noisy
+            build::Verbosity::Noisy
         } else {
-            building::Verbosity::Silent
+            build::Verbosity::Silent
         };
-        building::BuildBuilder::new(conf, project)
+        build::BuildBuilder::new(conf, project)
             .with_profile_name(&profile)
             .with_verbosity(verbosity)
             .try_finish()

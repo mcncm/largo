@@ -15,11 +15,34 @@ pub enum InteractionMode {
     ErrorStopMode,
 }
 
+impl clam::ArgValue for InteractionMode {
+    fn set_cmd_arg(&self, name: &str, cmd: &mut std::process::Command) {
+        let mode = match self {
+            InteractionMode::BatchMode => "batchmode",
+            InteractionMode::NonStopMode => "nonstopmode",
+            InteractionMode::ScrollMode => "scrollmode",
+            InteractionMode::ErrorStopMode => "errorstopmode",
+        };
+        cmd.args([name, &mode]);
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub enum MkTexFormat {
     Tex,
     Tfm,
     Pk,
+}
+
+impl clam::ArgValue for MkTexFormat {
+    fn set_cmd_arg(&self, name: &str, cmd: &mut std::process::Command) {
+        let format = match self {
+            MkTexFormat::Tex => "tex",
+            MkTexFormat::Tfm => "tfm",
+            MkTexFormat::Pk => "pk",
+        };
+        cmd.args([name, &format]);
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -33,10 +56,35 @@ pub enum SrcSpecial {
     Vbox,
 }
 
+impl clam::ArgValue for SrcSpecial {
+    fn set_cmd_arg(&self, name: &str, cmd: &mut std::process::Command) {
+        let special = match self {
+            SrcSpecial::Cr => "cr",
+            SrcSpecial::Display => "display",
+            SrcSpecial::Hbox => "hbox",
+            SrcSpecial::Math => "math",
+            SrcSpecial::Par => "par",
+            SrcSpecial::Parend => "parend",
+            SrcSpecial::Vbox => "vbox",
+        };
+        cmd.args([name, &special]);
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub enum Format {
     Pdf,
     Dvi,
+}
+
+impl clam::ArgValue for Format {
+    fn set_cmd_arg(&self, name: &str, cmd: &mut std::process::Command) {
+        let format = match self {
+            Format::Pdf => "pdf",
+            Format::Dvi => "dvi",
+        };
+        cmd.args([name, &format]);
+    }
 }
 
 pub type ConfigurationFileLine = String;
@@ -72,7 +120,7 @@ pub struct CommandLineOptions {
     /// be pdfinitex, for dumping formats; this is implicitly true if the program name is `pdfinitex'
     ini: bool,
     /// set interaction mode (STRING=batchmode/nonstopmode/scrollmode/errorstopmode)
-    interaction: Option<InteractionMode>,
+    pub interaction: Option<InteractionMode>,
     /// send DVI output to a socket as well as the usual output file
     ipc: bool,
     /// as -ipc, and also start the server at the other end
@@ -114,6 +162,7 @@ pub struct CommandLineOptions {
     synctex: Option<SynctexNumber>,
     /// use the TCX file TCXNAME
     translate_file: Option<TcxName>,
+    // FIXME: rename to `8bit`
     /// make all characters printable by default
     eight_bit: bool,
     /// display this help and exit

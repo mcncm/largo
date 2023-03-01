@@ -1,4 +1,4 @@
-pub mod building;
+pub mod build;
 pub mod conf;
 pub mod dirs;
 pub mod engines;

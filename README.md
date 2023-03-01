@@ -16,6 +16,7 @@ TeX is a staggering achievement of 1970s software engineering that I love to hat
 * Re-figuring-out almost *all* of the above when I realize I want to switch from `pdflatex` to `xelatex` or whatever.
 * Making _other_ tools, like my editor, aware of the cli flags I want for `pdflatex` (or `xelatex` or whatever).
 * Having to learn about yet another legacy system from the 80s---that exists to support some platform no one has used in 30 years---every time I want to solve one of these problems.
+* Reading errors from `pdflatex` is a total pain!
 
 There are other solutions to a lot of these problems, but they feel complicated to me, and make things harder in the long run.
 * [Overleaf](https://www.overleaf.com) is pretty good for sharing, and does solve some of these things, but I want to develop locally. I like my editor, I like version control, I like not needing internet to write, and I like doing things "my way."
