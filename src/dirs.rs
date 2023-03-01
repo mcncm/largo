@@ -1,6 +1,7 @@
 pub mod proj {
+    use crate::{files, project};
     use anyhow::{anyhow, Result};
-    use typedir::{path, pathref, PathBuf as P};
+    use typedir::{path, pathref, PathBuf as P, PathRef as R};
 
     pub const SRC_DIR: &'static str = "src";
     pub const MAIN_FILE: &'static str = "main.tex";
@@ -15,7 +16,7 @@ pub mod proj {
             CONFIG_FILE => node ConfigFile;
             LOCK_FILE => node LockFile;
             SRC_DIR => node SrcDir {
-                MAIN_FILE => node MainFile;
+                forall s: &str, s => node SrcFile;
             };
             BUILD_DIR => node BuildDir {
                 forall s: &crate::project::ProfileName, s.as_ref() => node ProfileBuildDir;
@@ -25,44 +26,87 @@ pub mod proj {
         };
     }
 
-    /// Initialize a largo project directory at the passed root
-    pub fn init(root: std::path::PathBuf, new_proj: NewProject) -> Result<()> {
-        // NOTE: This is *extremely* verbose without some kind of "pop-on-drop"
-        // list structure. Unfortunately, that seems to be tricky to mix with
-        // lots of newtypes and generics and macros.
-        let mut root = P::new(RootDir(()), root);
-        // Init git
-        std::process::Command::new("git")
-            .arg("init")
-            .arg(root.as_os_str())
-            .output()?;
-        // Project config file
-        {
-            let proj_conf = pathref!(root => ConfigFile);
-            ConfigFile::try_create(&proj_conf, &new_proj.project_config)?;
-        }
-        // Gitignore
-        {
-            let gitignore = pathref!(root => Gitignore);
-            try_create(&gitignore, ToCreate::File(crate::files::GITIGNORE))?;
-        }
-        // Source
-        {
-            let mut src_dir = pathref!(root => SrcDir);
-            try_create(&src_dir, ToCreate::Dir)?;
-            {
-                let main_file = pathref!(src_dir => MainFile);
-                try_create(&main_file, ToCreate::File(crate::files::MAIN_LATEX))?;
-            }
-        }
-        // Build directory
-        let build_dir = path!(root => BuildDir);
-        try_create(&build_dir, ToCreate::Dir)?;
-        Ok(())
+    pub enum ProjectKind {
+        Package,
+        Class,
+        Document,
     }
 
     pub struct NewProject<'a> {
-        pub project_config: &'a crate::project::ProjectConfig,
+        /// Project name
+        pub name: &'a str,
+        /// What kind of project is this?
+        pub kind: ProjectKind,
+    }
+
+    impl<'a> NewProject<'a> {
+        fn project_toml(&self) -> project::ProjectConfig {
+            let package = match self.kind {
+                ProjectKind::Package => Some(project::PackageConfig::default()),
+                _ => None,
+            };
+            let class = match self.kind {
+                ProjectKind::Class => Some(project::ClassConfig::default()),
+                _ => None,
+            };
+            project::ProjectConfig {
+                project: project::ProjectConfigHead {
+                    name: self.name.to_string(),
+                    system_settings: project::SystemSettings::default(),
+                    project_settings: project::ProjectSettings::default(),
+                },
+                package,
+                class,
+                profiles: project::Profiles::new(),
+                dependencies: project::Dependencies::new(),
+            }
+        }
+
+        /// Create a `main.tex`, `abc.sty`, or `xyz.cls`
+        fn try_create_src_file(&self, src_dir: &mut R<SrcDir>) -> Result<()> {
+            use typedir::Extend;
+            match self.kind {
+                ProjectKind::Package => todo!(),
+                ProjectKind::Class => todo!(),
+                ProjectKind::Document => {
+                    let src_file: R<SrcFile> = src_dir.extend("main.tex");
+                    try_create(&src_file, ToCreate::File(crate::files::GITIGNORE))
+                }
+            }
+        }
+
+        /// Initialize a largo project directory at the passed root
+        pub fn init(self, root: std::path::PathBuf) -> Result<()> {
+            // NOTE: This is *extremely* verbose without some kind of "pop-on-drop"
+            // list structure. Unfortunately, that seems to be tricky to mix with
+            // lots of newtypes and generics and macros.
+            let mut root = P::new(RootDir(()), root);
+            // Init git
+            std::process::Command::new("git")
+                .arg("init")
+                .arg(root.as_os_str())
+                .output()?;
+            // Project config file
+            {
+                let proj_conf = pathref!(root => ConfigFile);
+                ConfigFile::try_create(&proj_conf, &self.project_toml())?;
+            }
+            // Gitignore
+            {
+                let gitignore = pathref!(root => Gitignore);
+                try_create(&gitignore, ToCreate::File(crate::files::GITIGNORE))?;
+            }
+            // Source
+            {
+                let mut src_dir = pathref!(root => SrcDir);
+                try_create(&src_dir, ToCreate::Dir)?;
+                self.try_create_src_file(&mut src_dir)?;
+            }
+            // Build directory
+            let build_dir = path!(root => BuildDir);
+            try_create(&build_dir, ToCreate::Dir)?;
+            Ok(())
+        }
     }
 
     impl RootDir {

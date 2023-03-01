@@ -17,6 +17,7 @@ pub struct Project {
 pub struct ProjectConfig {
     pub project: ProjectConfigHead,
     pub package: Option<PackageConfig>,
+    pub class: Option<ClassConfig>,
     #[serde(rename = "profile", default)]
     pub profiles: Profiles,
     #[serde(default)]
@@ -34,6 +35,9 @@ pub struct ProjectConfigHead {
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct PackageConfig {}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct ClassConfig {}
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct ProfileName(String);

@@ -18,11 +18,17 @@ impl fmt::Display for PackageTexFormat {
 }
 
 #[derive(Debug, Clone)]
-pub struct PackageName(String);
+pub struct PackageName<'a>(&'a str);
 
-impl AsRef<str> for PackageName {
+impl<'a> AsRef<str> for PackageName<'a> {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+impl<'a> From<&'a str> for PackageName<'a> {
+    fn from(s: &'a str) -> Self {
+        Self(s)
     }
 }
 
@@ -82,6 +88,15 @@ pub struct ProvidesOptionalArg {
     banner: Option<IdentBanner>,
 }
 
+impl ProvidesOptionalArg {
+    fn with_current_date() -> Self {
+        Self {
+            date: PackageDate::current(),
+            banner: None,
+        }
+    }
+}
+
 impl fmt::Display for ProvidesOptionalArg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.date)?;
@@ -107,29 +122,77 @@ impl PackageKind {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct LatexPackageTemplate {
-    kind: PackageKind,
-    name: PackageName,
-    needs_format: PackageTexFormat,
-    provides_options: Option<ProvidesOptionalArg>,
+/// Trait for package and class templates
+trait TemplateKind {
+    const PROVIDES_MACRO: &'static str;
 }
 
-impl fmt::Display for LatexPackageTemplate {
+/// The actual internal data used by package/class templates
+#[derive(Debug, Clone)]
+struct TemplateData<'a, K: TemplateKind> {
+    name: PackageName<'a>,
+    needs_format: PackageTexFormat,
+    provides_options: Option<ProvidesOptionalArg>,
+    m: std::marker::PhantomData<K>,
+}
+
+impl<'a, K: TemplateKind> fmt::Display for TemplateData<'a, K> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Declare required TeX format
         writeln!(f, r#"\NeedsTexFormat{{{}}}"#, self.needs_format)?;
         // Declare provided package, with options
-        write!(
-            f,
-            r#"\{}{{{}}}"#,
-            self.kind.provides_macro(),
-            self.name.as_ref()
-        )?;
+        write!(f, r#"\{}{{{}}}"#, K::PROVIDES_MACRO, self.name.as_ref())?;
         if let Some(opts) = &self.provides_options {
             write!(f, "[{}]", opts)?;
         }
         writeln!(f)?;
         Ok(())
+    }
+}
+
+impl<'a, K: TemplateKind> TemplateData<'a, K> {
+    fn new(name: &PackageName<'a>) -> Self {
+        Self {
+            name: name.clone(),
+            needs_format: PackageTexFormat::Latex2e,
+            provides_options: Some(ProvidesOptionalArg::with_current_date()),
+            m: std::marker::PhantomData,
+        }
+    }
+}
+
+pub struct PackageTemplate<'a>(TemplateData<'a, Self>);
+
+impl<'a> TemplateKind for PackageTemplate<'a> {
+    const PROVIDES_MACRO: &'static str = "ProvidesPackage";
+}
+
+impl<'a> PackageTemplate<'a> {
+    fn new(name: &PackageName<'a>) -> Self {
+        Self(TemplateData::new(name))
+    }
+}
+
+impl<'a> fmt::Display for PackageTemplate<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+pub struct ClassTemplate<'a>(TemplateData<'a, Self>);
+
+impl<'a> TemplateKind for ClassTemplate<'a> {
+    const PROVIDES_MACRO: &'static str = "ProvidesPackage";
+}
+
+impl<'a> ClassTemplate<'a> {
+    fn new(name: &PackageName<'a>) -> Self {
+        Self(TemplateData::new(name))
+    }
+}
+
+impl<'a> fmt::Display for ClassTemplate<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }

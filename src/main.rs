@@ -54,16 +54,33 @@ enum ProjectSubcommand {
 }
 
 #[derive(Parser)]
+#[clap(group(
+    clap::ArgGroup::new("type")
+        .multiple(false)
+        .args(&["package", "class"])
+        .conflicts_with("doc")
+))]
 struct InitSubcommand {
     // TODO: should probably be a `PathBuf`
     name: String,
-    /// Create a (La)TeX package if passing the `--package` flag.
+    /// Create a (La)TeX package.
     #[arg(long)]
     package: bool,
+    /// Create a (La)TeX class.
+    #[arg(long)]
+    class: bool,
+    /// Create a (La)TeX document.
+    #[arg(
+        long,
+        default_value_t = true,
+        default_value_if("package", "true", "false"),
+        default_value_if("class", "true", "false")
+    )]
+    doc: bool,
     /// Create a Beamer project. If the `--package` flag is passed, create an
     /// empty Beamer template.
-    #[arg(long)]
-    beamer: bool,
+    #[clap(skip)]
+    _beamer: bool,
     #[arg(long, value_enum)]
     /// Overrides the default TeX format if set
     system: Option<TexFormat>,
@@ -80,25 +97,25 @@ struct BuildSubcommand {
 }
 
 impl InitSubcommand {
-    fn project_toml(self) -> project::ProjectConfig {
-        project::ProjectConfig {
-            project: project::ProjectConfigHead {
-                name: self.name.clone(),
-                system_settings: project::SystemSettings::default(),
-                project_settings: project::ProjectSettings::default(),
-            },
-            profiles: project::Profiles::new(),
-            dependencies: project::Dependencies::new(),
+    fn project_kind(&self) -> dirs::proj::ProjectKind {
+        use dirs::proj::ProjectKind::*;
+        if self.doc {
+            Document
+        } else if self.package {
+            Package
+        } else if self.class {
+            Class
+        } else {
+            unreachable!()
         }
     }
-}
 
-impl InitSubcommand {
-    /// Only call in project directory
     fn execute(self, path: std::path::PathBuf) -> Result<()> {
-        let project_config = &self.project_toml();
-        let new_project = dirs::proj::NewProject { project_config };
-        dirs::proj::init(path, new_project)
+        let new_project = dirs::proj::NewProject {
+            name: self.name.as_str(),
+            kind: self.project_kind(),
+        };
+        new_project.init(path)
     }
 }
 
