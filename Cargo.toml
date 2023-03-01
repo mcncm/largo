@@ -14,3 +14,4 @@ thiserror = "1.0"
 anyhow = "1.0"
 typedir = { path = "./typedir" }
 clam = { path = "./clam" }
+chrono = { version = "0.4" }
