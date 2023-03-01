@@ -8,14 +8,18 @@ use largo::{
     project,
 };
 
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Subcommand,
+    /// Print the parsed cli options and exit
+    #[cfg(debug_assertions)]
+    #[arg(long)]
+    debug: bool,
 }
 
-#[derive(clap::Subcommand)]
+#[derive(Debug, clap::Subcommand)]
 enum Subcommand {
     #[command(flatten)]
     Create(CreateSubcommand),
@@ -26,7 +30,7 @@ enum Subcommand {
     DebugLargo,
 }
 
-#[derive(clap::Subcommand)]
+#[derive(Debug, clap::Subcommand)]
 enum CreateSubcommand {
     /// Initialize a largo project in the current directory
     Init(InitSubcommand),
@@ -34,7 +38,7 @@ enum CreateSubcommand {
     New(InitSubcommand),
 }
 
-#[derive(clap::Subcommand)]
+#[derive(Debug, clap::Subcommand)]
 enum ProjectSubcommand {
     /// Build the current project
     Build(BuildSubcommand),
@@ -53,7 +57,7 @@ enum ProjectSubcommand {
     DebugBuild(BuildSubcommand),
 }
 
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 #[clap(group(
     clap::ArgGroup::new("type")
         .multiple(false)
@@ -89,7 +93,7 @@ struct InitSubcommand {
     engine: Option<TexEngine>,
 }
 
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 struct BuildSubcommand {
     #[arg(short = 'p', long)]
     /// Overrides the default build profile if set
@@ -214,6 +218,11 @@ impl Subcommand {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    #[cfg(debug_assertions)]
+    if cli.debug {
+        println!("{:#?}", cli);
+        return Ok(());
+    }
     let res = cli.command.execute();
     if let Err(ref err) = res {
         println!("{:?}", err.backtrace());
