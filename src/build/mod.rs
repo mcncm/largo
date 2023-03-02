@@ -73,6 +73,10 @@ impl BuildVars {
     fn new() -> Self {
         Self(BTreeMap::new())
     }
+
+    fn insert<V: std::fmt::Display>(&mut self, k: &'static str, v: V) {
+        self.0.insert(k, format!("{}", v));
+    }
 }
 
 impl BuildVars {
@@ -87,8 +91,15 @@ impl BuildVars {
             }
         }
         if !tex_inputs.is_empty() {
-            self.0.insert("TEXINPUTS", tex_inputs);
+            self.insert("TEXINPUTS", tex_inputs);
         }
+        self
+    }
+
+    /// NOTE: there seems to be no way to *actually* turn off line wrapping from
+    /// pdflatex, but we can fake it by wrapping at a very high column number.
+    fn disable_line_wrapping(mut self) -> Self {
+        self.insert("max_print_line", i32::MAX);
         self
     }
 }
@@ -196,7 +207,9 @@ impl<'a> BuildSettings<'a> {
     }
 
     fn build_vars(&self) -> BuildVars {
-        BuildVars::new().with_dependencies(&self.dependencies)
+        BuildVars::new()
+            .with_dependencies(&self.dependencies)
+            .disable_line_wrapping()
     }
 
     fn build_command(mut self) -> std::process::Command {
@@ -212,7 +225,7 @@ impl<'a> BuildSettings<'a> {
             Verbosity::Silent => {
                 cmd.stdout(process::Stdio::null());
             }
-            Verbosity::Info(_LogLevel) => {
+            Verbosity::Info(_log_level) => {
                 // What do we do here? Custom pipe?
                 todo!();
             }
