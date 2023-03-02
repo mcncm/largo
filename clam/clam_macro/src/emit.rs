@@ -7,7 +7,7 @@ use crate::{Error, Result};
 fn to_one_dash_kebab_case(old: &str) -> String {
     std::iter::once('-')
         .chain(old.chars())
-        .map(|c| if c == '_' { '_' } else { c })
+        .map(|c| if c == '_' { '-' } else { c })
         .collect()
 }
 
@@ -16,7 +16,7 @@ fn to_two_dash_kebab_case(old: &str) -> String {
     std::iter::once('-')
         .chain(std::iter::once('-'))
         .chain(old.chars())
-        .map(|c| if c == '_' { '_' } else { c })
+        .map(|c| if c == '_' { '-' } else { c })
         .collect()
 }
 
