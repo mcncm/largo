@@ -234,8 +234,5 @@ fn main() -> Result<()> {
         return Ok(());
     }
     let res = cli.command.execute();
-    if let Err(ref err) = res {
-        println!("{:?}", err.backtrace());
-    }
     res
 }
