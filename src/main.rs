@@ -144,14 +144,14 @@ impl CreateSubcommand {
 }
 
 impl BuildSubcommand {
-    fn try_into_build(
-        self,
+    fn try_to_build(
+        &self,
         project: project::Project,
         conf: &LargoConfig,
     ) -> Result<largo::build::Build> {
         use largo::build;
-        let profile = match self.profile {
-            Some(p) => Some(p.try_into()?),
+        let profile = match &self.profile {
+            Some(p) => Some(p.as_str().try_into()?),
             None => None,
         };
         let verbosity = if self.verbose {
@@ -160,26 +160,26 @@ impl BuildSubcommand {
             build::Verbosity::Silent
         };
         build::BuildBuilder::new(conf, project)
-            .with_profile_name(&profile)
+            .with_profile_name(profile)
             .with_verbosity(verbosity)
             .try_finish()
     }
 }
 
 impl ProjectSubcommand {
-    fn execute(self, project: project::Project, conf: &LargoConfig) -> Result<()> {
+    fn execute(&self, project: project::Project, conf: &LargoConfig) -> Result<()> {
         use ProjectSubcommand::*;
         match self {
-            Build(subcmd) => subcmd.try_into_build(project, conf)?.run(),
+            Build(subcmd) => subcmd.try_to_build(project, conf)?.run(),
             // the `Project` is (reasonable) proof that it is a valid project:
             // the manifest file parses. It's *reasonably* safe to delete a
             // directory if `proj` is constructed.
             Clean { profile } => {
                 let root = project.root;
                 let build_dir = typedir::path!(root => dirs::BuildDir);
-                match profile {
+                match &profile {
                     Some(profile) => {
-                        let profile: crate::project::ProfileName = profile.try_into()?;
+                        let profile: crate::project::ProfileName = profile.as_str().try_into()?;
                         use typedir::Extend;
                         let profile_dir: typedir::PathBuf<dirs::ProfileBuildDir> =
                             build_dir.extend(&profile);
@@ -200,7 +200,7 @@ impl ProjectSubcommand {
             // This subcommand only exists in debug builds
             #[cfg(debug_assertions)]
             DebugBuild(subcmd) => {
-                let build = subcmd.try_into_build(project, conf)?;
+                let build = subcmd.try_to_build(project, conf)?;
                 println!("{:#?}", build);
                 Ok(())
             }

@@ -89,7 +89,7 @@ pub struct LargoConfig<'c> {
     #[serde(flatten, borrow)]
     pub executables: ExecutableConfig<'c>,
     /// The default profile selected if no other profile is chosen.
-    pub default_profile: crate::project::ProfileName,
+    pub default_profile: crate::project::ProfileName<'c>,
     /// The default TeX format
     pub default_tex_format: TexFormat,
     /// The default TeX engine
@@ -133,18 +133,17 @@ pub fn with_config<T, F: FnOnce(&LargoConfig, Option<crate::project::Project>) -
 
     // Project configuration
     let root = dirs::RootDir::find().ok();
-    let project = if let Some(mut root) = root {
+    if let Some(mut root) = root {
         let project_config_file = typedir::pathref!(root => dirs::ProjectConfigFile);
         let project_config_contents = dirs::ProjectConfigFile::try_read(&project_config_file)?;
         let project_config = toml::from_str(&project_config_contents)?;
         drop(project_config_file);
-        Some(crate::project::Project {
+        let project = Some(crate::project::Project {
             root,
             config: project_config,
-        })
+        });
+        Ok(f(&global_config, project))
     } else {
-        None
-    };
-
-    Ok(f(&global_config, project))
+        Ok(f(&global_config, None))
+    }
 }

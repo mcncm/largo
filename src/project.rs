@@ -5,20 +5,20 @@ use serde::{Deserialize, Serialize};
 use crate::{conf, dirs};
 
 #[derive(Debug)]
-pub struct Project {
+pub struct Project<'c> {
     pub root: typedir::PathBuf<dirs::RootDir>,
-    pub config: ProjectConfig,
+    pub config: ProjectConfig<'c>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ProjectConfig {
+pub struct ProjectConfig<'c> {
     pub project: ProjectConfigHead,
     pub package: Option<PackageConfig>,
     pub class: Option<ClassConfig>,
-    #[serde(rename = "profile", default)]
-    pub profiles: Profiles,
+    #[serde(rename = "profile", default, borrow)]
+    pub profiles: Profiles<'c>,
     #[serde(default)]
-    pub dependencies: Dependencies,
+    pub dependencies: Dependencies<'c>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -36,45 +36,45 @@ pub struct PackageConfig {}
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct ClassConfig {}
 
-#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(transparent)]
-pub struct ProfileName(String);
+pub struct ProfileName<'c>(&'c str);
 
-impl Default for ProfileName {
+impl<'c> Default for ProfileName<'c> {
     fn default() -> Self {
-        Self(crate::conf::DEBUG_PROFILE.to_string())
+        Self(crate::conf::DEBUG_PROFILE)
     }
 }
 
-impl AsRef<str> for ProfileName {
+impl<'c> AsRef<str> for ProfileName<'c> {
     fn as_ref(&self) -> &str {
-        &self.0
+        self.0
     }
 }
 
-impl std::fmt::Display for ProfileName {
+impl<'c> std::fmt::Display for ProfileName<'c> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl TryFrom<String> for ProfileName {
+impl<'c> TryFrom<&'c str> for ProfileName<'c> {
     type Error = anyhow::Error;
 
-    fn try_from(s: String) -> std::result::Result<Self, Self::Error> {
+    fn try_from(s: &'c str) -> std::result::Result<Self, Self::Error> {
         Ok(Self(s))
     }
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct Profiles(BTreeMap<ProfileName, Profile>);
+pub struct Profiles<'c>(#[serde(borrow)] BTreeMap<ProfileName<'c>, Profile>);
 
-impl Profiles {
-    pub fn new() -> Profiles {
+impl<'c> Profiles<'c> {
+    pub fn new() -> Profiles<'c> {
         Self(BTreeMap::new())
     }
 
-    pub fn select_profile(mut self, name: &ProfileName) -> Option<Profile> {
+    pub fn select_profile(mut self, name: &ProfileName<'c>) -> Option<Profile> {
         self.0.remove(name)
     }
 }
@@ -121,41 +121,41 @@ impl ProjectSettings {
 }
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct DependencyName(String);
+pub struct DependencyName<'c>(&'c str);
 
-impl AsRef<str> for DependencyName {
+impl<'c> AsRef<str> for DependencyName<'c> {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl std::fmt::Display for DependencyName {
+impl<'c> std::fmt::Display for DependencyName<'c> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl TryFrom<String> for DependencyName {
+impl<'c> TryFrom<&'c str> for DependencyName<'c> {
     type Error = anyhow::Error;
 
-    fn try_from(s: String) -> std::result::Result<Self, Self::Error> {
+    fn try_from(s: &'c str) -> std::result::Result<Self, Self::Error> {
         Ok(Self(s))
     }
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct Dependencies(BTreeMap<DependencyName, Dependency>);
+pub struct Dependencies<'c>(#[serde(borrow)] BTreeMap<DependencyName<'c>, Dependency<'c>>);
 
-impl Dependencies {
+impl<'c> Dependencies<'c> {
     pub fn new() -> Self {
         Self(BTreeMap::new())
     }
 }
 
-impl<'a> IntoIterator for &'a Dependencies {
-    type Item = <&'a BTreeMap<DependencyName, Dependency> as IntoIterator>::Item;
+impl<'a> IntoIterator for &'a Dependencies<'a> {
+    type Item = <&'a BTreeMap<DependencyName<'a>, Dependency<'a>> as IntoIterator>::Item;
 
-    type IntoIter = <&'a BTreeMap<DependencyName, Dependency> as IntoIterator>::IntoIter;
+    type IntoIter = <&'a BTreeMap<DependencyName<'a>, Dependency<'a>> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         (&self.0).into_iter()
@@ -164,6 +164,6 @@ impl<'a> IntoIterator for &'a Dependencies {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum Dependency {
-    Path { path: String },
+pub enum Dependency<'c> {
+    Path { path: &'c str },
 }

@@ -40,7 +40,7 @@ typedir::typedir! {
             forall s: &str, s => node SrcFile;
         };
         BUILD_DIR => node BuildDir {
-            forall s: &crate::project::ProfileName, s.as_ref() => node ProfileBuildDir;
+            forall s: &crate::project::ProfileName<'_>, s.as_ref() => node ProfileBuildDir;
         };
         GIT_DIR => node GitDir;
         GITIGNORE => node Gitignore;

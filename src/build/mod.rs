@@ -21,7 +21,7 @@ impl AsRef<OsStr> for TexInput {
 /// Variables available at TeX run time
 #[derive(Debug)]
 struct LargoVars<'a> {
-    profile: &'a ProfileName,
+    profile: ProfileName<'a>,
     bibliography: Option<&'a str>,
     output_directory: P<dirs::ProfileBuildDir>,
 }
@@ -38,9 +38,9 @@ impl<'a> LargoVars<'a> {
         // NOTE: unfortunate clone
         let root_dir = settings.root_dir.clone();
         Self {
-            profile: &settings.profile_name,
+            profile: settings.profile_name,
             bibliography: settings.conf.default_bibliography,
-            output_directory: root_dir.extend(()).extend(settings.profile_name),
+            output_directory: root_dir.extend(()).extend(&settings.profile_name),
         }
     }
 
@@ -123,14 +123,14 @@ pub enum Verbosity {
 
 pub struct BuildBuilder<'a> {
     conf: &'a LargoConfig<'a>,
-    project: Project,
+    project: Project<'a>,
     verbosity: Verbosity,
     /// Which profile to build in
-    profile_name: Option<&'a crate::project::ProfileName>,
+    profile_name: Option<crate::project::ProfileName<'a>>,
 }
 
 impl<'a> BuildBuilder<'a> {
-    pub fn new(conf: &'a LargoConfig, project: Project) -> Self {
+    pub fn new(conf: &'a LargoConfig, project: Project<'a>) -> Self {
         Self {
             conf,
             project,
@@ -139,8 +139,8 @@ impl<'a> BuildBuilder<'a> {
         }
     }
 
-    pub fn with_profile_name(mut self, name: &'a Option<crate::project::ProfileName>) -> Self {
-        self.profile_name = name.as_ref();
+    pub fn with_profile_name(mut self, name: Option<crate::project::ProfileName<'a>>) -> Self {
+        self.profile_name = name.as_ref().copied();
         self
     }
 
@@ -154,11 +154,11 @@ impl<'a> BuildBuilder<'a> {
         let conf = self.conf;
         let project = self.project;
         let root_dir = project.root;
-        let profile_name = self.profile_name.unwrap_or(&self.conf.default_profile);
+        let profile_name = self.profile_name.unwrap_or(self.conf.default_profile);
         // FIXME This is a bug: there should *always* be a default profile to select
         let profiles = project.config.profiles;
         let profile = profiles
-            .select_profile(profile_name)
+            .select_profile(&profile_name)
             .ok_or_else(|| anyhow!("profile `{}` not found", profile_name))?;
         let proj_conf = project.config.project;
         let project_settings = proj_conf.project_settings.merge(profile.project_settings);
@@ -186,10 +186,10 @@ impl<'a> BuildBuilder<'a> {
 struct BuildSettings<'a> {
     conf: &'a LargoConfig<'a>,
     root_dir: P<dirs::RootDir>,
-    profile_name: &'a ProfileName,
+    profile_name: ProfileName<'a>,
     system_settings: SystemSettings,
     project_settings: ProjectSettings,
-    dependencies: Dependencies,
+    dependencies: Dependencies<'a>,
     verbosity: Verbosity,
 }
 
@@ -255,7 +255,7 @@ impl<'a> BuildSettings<'a> {
         use clam::Options;
         pdflatex_options.apply(&mut cmd);
         let build_dir: P<dirs::ProfileBuildDir> =
-            self.root_dir.extend(()).extend(self.profile_name);
+            self.root_dir.extend(()).extend(&self.profile_name);
         std::fs::create_dir_all(&build_dir).expect("TODO: Sorry, this code needs to be refactored; it's a waste of time to handle this error.");
         match &self.project_settings.shell_escape {
             Some(true) => cmd.arg("-shell-escape"),
