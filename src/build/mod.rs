@@ -225,7 +225,8 @@ impl<'a> BuildSettings<'a> {
         let mut plb = engines::pdflatex::PdflatexBuilder::new(self.executable(), tex_input)
             .with_src_dir((&mut self.root_dir).extend(()))
             .with_build_vars(&self.build_vars())
-            .with_verbosity(self.verbosity);
+            .with_verbosity(self.verbosity)
+            .with_synctex(self.project_settings.synctex);
         let build_dir: P<dirs::ProfileBuildDir> =
             self.root_dir.extend(()).extend(&self.profile_name);
         // FIXME this should happen *at build time*, right?

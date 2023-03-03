@@ -29,11 +29,12 @@ pub enum TexEngine {
     Luatex,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputFormat {
     Dvi,
     Ps,
+    #[default]
     Pdf,
 }
 

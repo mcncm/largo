@@ -86,10 +86,6 @@ impl<'c> Profiles<'c> {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Profile {
-    /// whether to use SyncTeX to synchronize between TeX source and the
-    /// compiled document
-    #[serde(default)]
-    pub synctex: bool,
     #[serde(flatten)]
     pub project_settings: ProjectSettings,
     #[serde(flatten)]
@@ -108,7 +104,13 @@ pub struct SystemSettings {
 #[serde(rename_all = "kebab-case")]
 pub struct ProjectSettings {
     pub output_format: Option<conf::OutputFormat>,
+    /// Whether to use shell-escape (if present and `true`), no-shell-escape (if
+    /// present and `false`), or neither.
     pub shell_escape: Option<bool>,
+    /// whether to use SyncTeX to synchronize between TeX source and the
+    /// compiled document
+    #[serde(default)]
+    pub synctex: bool,
 }
 
 impl SystemSettings {
@@ -126,6 +128,9 @@ impl ProjectSettings {
         Self {
             output_format: self.output_format.or(other.output_format),
             shell_escape: self.shell_escape.or(other.shell_escape),
+            // TODO: think: is this really how we want to merge these? Isn't this
+            // too infectious?
+            synctex: self.synctex || other.synctex,
         }
     }
 }
