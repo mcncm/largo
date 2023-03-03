@@ -160,7 +160,7 @@ impl BuildSubcommand {
             build::Verbosity::Silent
         };
         build::BuildBuilder::new(conf, project)
-            .with_profile_name(profile)
+            .with_profile(profile)
             .with_verbosity(verbosity)
             .try_finish()
     }

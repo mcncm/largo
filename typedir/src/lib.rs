@@ -30,6 +30,7 @@ pub struct PathBuf<N: Node> {
     path: std::path::PathBuf,
     m: PhantomData<N>,
 }
+
 impl<N: Node> PathBuf<N> {
     pub fn new<I: Into<std::path::PathBuf>>(_m: N, path: I) -> Self {
         Self {
@@ -138,6 +139,12 @@ macro_rules! dir {
         }
 
     };
+}
+
+impl<N: Node> From<PathBuf<N>> for std::path::PathBuf {
+    fn from(p: PathBuf<N>) -> Self {
+        p.path
+    }
 }
 
 impl<N: Node> std::ops::Deref for PathBuf<N> {

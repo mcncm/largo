@@ -1,11 +1,68 @@
 use serde::Serialize;
 
-pub struct Pdflatex<'a> {
-    _binary: &'a dyn AsRef<std::ffi::OsStr>,
-    _cli_options: CommandLineOptions,
+use crate::{build::Verbosity, dirs};
+
+pub struct PdflatexBuilder {
+    cmd: std::process::Command,
+    tex_input: crate::build::TexInput,
+    // FIXME: Not really the right type here
+    verbosity: Verbosity,
+    pub cli_options: CommandLineOptions,
 }
 
-impl<'a> super::TexEngine for Pdflatex<'a> {}
+impl PdflatexBuilder {
+    pub fn new<E: AsRef<std::ffi::OsStr>>(
+        executable: E,
+        tex_input: crate::build::TexInput,
+    ) -> Self {
+        let cmd = std::process::Command::new(executable);
+        let mut cli_options = CommandLineOptions::default();
+        // Always use nonstop mode for now.
+        cli_options.interaction = Some(crate::engines::pdflatex::InteractionMode::NonStopMode);
+        Self {
+            cmd,
+            tex_input,
+            cli_options,
+            verbosity: Verbosity::default(),
+        }
+    }
+
+    pub fn with_src_dir<P: typedir::AsPath<dirs::SrcDir>>(mut self, dir: P) -> Self {
+        self.cmd.current_dir(dir);
+        self
+    }
+
+    pub fn with_verbosity(mut self, verbosity: Verbosity) -> Self {
+        self.verbosity = verbosity;
+        self
+    }
+
+    pub fn with_build_vars(mut self, build_vars: &crate::build::BuildVars) -> Self {
+        build_vars.apply(&mut self.cmd);
+        self
+    }
+
+    pub fn finalize(self) -> crate::build::Build {
+        let mut cmd = self.cmd;
+        // What to do with the output
+        match &self.verbosity {
+            Verbosity::Silent => {
+                cmd.stdout(std::process::Stdio::null());
+            }
+            Verbosity::Info(_log_level) => {
+                // What do we do here? Custom pipe?
+                todo!();
+            }
+            Verbosity::Noisy => {
+                // Don't have to do anything, inheriting stdout
+            }
+        }
+        clam::Options::apply(self.cli_options, &mut cmd);
+        // The actual input to the tex program
+        cmd.arg(self.tex_input);
+        crate::build::Build { cmd }
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub enum InteractionMode {
@@ -138,7 +195,7 @@ pub struct CommandLineOptions {
     /// use STRING for DVI file comment instead of date (no effect for PDF)
     output_comment: Option<String>,
     /// use existing DIR as the directory to write files in
-    output_directory: Option<std::path::PathBuf>,
+    pub output_directory: Option<std::path::PathBuf>,
     /// use FORMAT for job output; FORMAT is `dvi' or `pdf'
     output_format: Option<Format>,
     /// enable parsing of first line of input file

@@ -4,13 +4,14 @@ use std::ffi::OsStr;
 use anyhow::{anyhow, Result};
 
 use thiserror::__private::PathAsDisplay;
-use typedir::{Extend, PathBuf as P, PathRef as R};
+use typedir::{Extend, PathBuf as P};
 
 use crate::conf::{self, LargoConfig};
-use crate::dirs;
 use crate::project::{self, Dependencies, ProfileName, Project, ProjectSettings, SystemSettings};
+use crate::{dirs, engines};
 
-struct TexInput(String);
+// Probably shouldn't really be public: currently is just for PdflatexBuilder's sake
+pub struct TexInput(String);
 
 impl AsRef<OsStr> for TexInput {
     fn as_ref(&self) -> &OsStr {
@@ -67,7 +68,7 @@ fn tex_input(largo_vars: LargoVars, _conf: &LargoConfig) -> TexInput {
 
 /// Environment variables for the build command
 #[derive(Debug, Default)]
-struct BuildVars(BTreeMap<&'static str, String>);
+pub struct BuildVars(BTreeMap<&'static str, String>);
 
 impl BuildVars {
     fn new() -> Self {
@@ -102,6 +103,12 @@ impl BuildVars {
         self.insert("max_print_line", i32::MAX);
         self
     }
+
+    pub fn apply(&self, cmd: &mut std::process::Command) {
+        for (var, val) in &self.0 {
+            cmd.env(var, val);
+        }
+    }
 }
 
 /// Level of severity of information to forward from TeX engine
@@ -126,7 +133,7 @@ pub struct BuildBuilder<'a> {
     project: Project<'a>,
     verbosity: Verbosity,
     /// Which profile to build in
-    profile_name: Option<crate::project::ProfileName<'a>>,
+    profile: Option<crate::project::ProfileName<'a>>,
 }
 
 impl<'a> BuildBuilder<'a> {
@@ -135,12 +142,12 @@ impl<'a> BuildBuilder<'a> {
             conf,
             project,
             verbosity: Verbosity::Silent,
-            profile_name: None,
+            profile: None,
         }
     }
 
-    pub fn with_profile_name(mut self, name: Option<crate::project::ProfileName<'a>>) -> Self {
-        self.profile_name = name.as_ref().copied();
+    pub fn with_profile(mut self, name: Option<crate::project::ProfileName<'a>>) -> Self {
+        self.profile = name.as_ref().copied();
         self
     }
 
@@ -154,7 +161,7 @@ impl<'a> BuildBuilder<'a> {
         let conf = self.conf;
         let project = self.project;
         let root_dir = project.root;
-        let profile_name = self.profile_name.unwrap_or(self.conf.default_profile);
+        let profile_name = self.profile.unwrap_or(self.conf.default_profile);
         // FIXME This is a bug: there should *always* be a default profile to select
         let profiles = project.config.profiles;
         let profile = profiles
@@ -212,80 +219,40 @@ impl<'a> BuildSettings<'a> {
             .disable_line_wrapping()
     }
 
-    fn build_command(mut self) -> std::process::Command {
-        use std::process;
+    fn to_build(mut self) -> Result<Build> {
         let largo_vars = LargoVars::from_build_settings(&self);
         let tex_input = tex_input(largo_vars, self.conf);
-        let build_vars = self.build_vars();
-        let mut cmd = std::process::Command::new(self.executable());
-        if !matches!(self.verbosity, Verbosity::Noisy) {
-            cmd.stdout(process::Stdio::null());
-        }
-        match &self.verbosity {
-            Verbosity::Silent => {
-                cmd.stdout(process::Stdio::null());
-            }
-            Verbosity::Info(_log_level) => {
-                // What do we do here? Custom pipe?
-                todo!();
-            }
-            Verbosity::Noisy => {
-                // Don't have to do anything, inheriting stdout
-            }
-        }
-        {
-            let src_dir: R<dirs::SrcDir> = (&mut self.root_dir).extend(());
-            cmd.current_dir(src_dir);
-        }
-        for (var, val) in build_vars.0 {
-            cmd.env(var, val);
-        }
-        let mut pdflatex_options = crate::engines::pdflatex::CommandLineOptions::default();
+        let mut plb = engines::pdflatex::PdflatexBuilder::new(self.executable(), tex_input)
+            .with_src_dir((&mut self.root_dir).extend(()))
+            .with_build_vars(&self.build_vars())
+            .with_verbosity(self.verbosity);
+        let build_dir: P<dirs::ProfileBuildDir> =
+            self.root_dir.extend(()).extend(&self.profile_name);
+        // FIXME this should happen *at build time*, right?
+        std::fs::create_dir_all(&build_dir).expect("TODO: Sorry, this code needs to be refactored; it's a waste of time to handle this error.");
+        plb.cli_options.output_directory = Some(build_dir.into());
         match self.project_settings.shell_escape {
             Some(true) => {
-                pdflatex_options.shell_escape = true;
+                plb.cli_options.shell_escape = true;
             }
             Some(false) => {
-                pdflatex_options.no_shell_escape = true;
+                plb.cli_options.no_shell_escape = true;
             }
             None => (),
         };
-        // Always use nonstop mode for now.
-        pdflatex_options.interaction = Some(crate::engines::pdflatex::InteractionMode::NonStopMode);
-        use clam::Options;
-        pdflatex_options.apply(&mut cmd);
-        let build_dir: P<dirs::ProfileBuildDir> =
-            self.root_dir.extend(()).extend(&self.profile_name);
-        std::fs::create_dir_all(&build_dir).expect("TODO: Sorry, this code needs to be refactored; it's a waste of time to handle this error.");
-        match &self.project_settings.shell_escape {
-            Some(true) => cmd.arg("-shell-escape"),
-            Some(false) => cmd.arg("-no-shell-escape"),
-            // Needed to make types match
-            None => &mut cmd,
-        }
-        .args([
-            "-output-directory",
-            build_dir.to_str().expect("some kind of non-utf8 path"),
-        ])
-        .arg(&tex_input);
-        cmd
-    }
-
-    fn to_build(self) -> Result<Build> {
-        Ok(Build {
-            shell_cmd: self.build_command(),
-        })
+        Ok(plb.finalize())
     }
 }
 
 #[derive(Debug)]
 pub struct Build {
-    shell_cmd: std::process::Command,
+    // FIXME this absolutely should not be public
+    pub cmd: std::process::Command,
 }
 
 impl Build {
     pub fn run(mut self) -> Result<()> {
-        let mut child = self.shell_cmd.spawn()?;
+        let mut child = self.cmd.spawn()?;
         child.wait()?;
         Ok(())
     }
