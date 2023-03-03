@@ -3,7 +3,7 @@ use serde::Serialize;
 use crate::{build::Verbosity, dirs};
 
 pub struct PdflatexBuilder {
-    cmd: std::process::Command,
+    cmd: crate::build::Command,
     tex_input: crate::build::TexInput,
     // FIXME: Not really the right type here
     verbosity: Verbosity,
@@ -15,7 +15,7 @@ impl PdflatexBuilder {
         executable: E,
         tex_input: crate::build::TexInput,
     ) -> Self {
-        let cmd = std::process::Command::new(executable);
+        let cmd = crate::build::Command::new(executable);
         let mut cli_options = CommandLineOptions::default();
         // Always use nonstop mode for now.
         cli_options.interaction = Some(crate::engines::pdflatex::InteractionMode::NonStopMode);

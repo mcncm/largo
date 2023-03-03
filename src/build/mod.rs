@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::ffi::OsStr;
 
 use anyhow::{anyhow, Result};
+pub use smol::process::Command;
 
 use thiserror::__private::PathAsDisplay;
 use typedir::{Extend, PathBuf as P};
@@ -104,7 +105,7 @@ impl BuildVars {
         self
     }
 
-    pub fn apply(&self, cmd: &mut std::process::Command) {
+    pub fn apply(&self, cmd: &mut Command) {
         for (var, val) in &self.0 {
             cmd.env(var, val);
         }
@@ -248,13 +249,13 @@ impl<'a> BuildSettings<'a> {
 #[derive(Debug)]
 pub struct Build {
     // FIXME this absolutely should not be public
-    pub cmd: std::process::Command,
+    pub cmd: Command,
 }
 
 impl Build {
     pub async fn run(mut self) -> Result<()> {
-        let mut child = self.cmd.spawn()?;
-        child.wait()?;
+        self.cmd.spawn()?;
+        // `async_process::Child` does not require a manual call to `.wait()`.
         Ok(())
     }
 }
