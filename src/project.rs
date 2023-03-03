@@ -11,6 +11,7 @@ pub struct Project<'c> {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct ProjectConfig<'c> {
     pub project: ProjectConfigHead,
     pub package: Option<PackageConfig>,
@@ -22,6 +23,7 @@ pub struct ProjectConfig<'c> {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct ProjectConfigHead {
     pub name: String,
     #[serde(flatten)]
@@ -31,9 +33,11 @@ pub struct ProjectConfigHead {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct PackageConfig {}
 
 #[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct ClassConfig {}
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -82,6 +86,10 @@ impl<'c> Profiles<'c> {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Profile {
+    /// whether to use SyncTeX to synchronize between TeX source and the
+    /// compiled document
+    #[serde(default)]
+    pub synctex: bool,
     #[serde(flatten)]
     pub project_settings: ProjectSettings,
     #[serde(flatten)]
@@ -89,6 +97,7 @@ pub struct Profile {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct SystemSettings {
     pub tex_format: Option<conf::TexFormat>,
     pub tex_engine: Option<conf::TexEngine>,
@@ -96,6 +105,7 @@ pub struct SystemSettings {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct ProjectSettings {
     pub output_format: Option<conf::OutputFormat>,
     pub shell_escape: Option<bool>,

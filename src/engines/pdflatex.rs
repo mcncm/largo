@@ -42,6 +42,13 @@ impl PdflatexBuilder {
         self
     }
 
+    pub fn with_synctex(mut self, use_synctex: bool) -> Self {
+        if use_synctex {
+            self.cli_options.synctex = Some(SYNCTEX_GZIPPED);
+        }
+        self
+    }
+
     pub fn finalize(self) -> crate::build::Build {
         let mut cmd = self.cmd;
         // What to do with the output
@@ -150,6 +157,10 @@ pub type TcxName = String;
 
 /// Syntex option type
 pub type SynctexNumber = i32;
+
+pub const SYNCTEX_GZIPPED: SynctexNumber = 1;
+
+pub const SYNCTEX_UNZIPPED: SynctexNumber = -1;
 
 /// Kpathsea debug option type
 pub type KpathseaNumber = i32;

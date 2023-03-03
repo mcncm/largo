@@ -186,7 +186,6 @@ impl ProjectSubcommand {
                         std::fs::remove_dir_all(&profile_dir)?;
                     }
                     None => {
-                        // FIXME: this seems to be printing `<disabled>`. Why?
                         std::fs::remove_dir_all(&build_dir)?;
                     }
                 }
