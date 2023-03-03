@@ -80,7 +80,7 @@ pub enum InteractionMode {
 }
 
 impl clam::ArgValue for InteractionMode {
-    fn set_cmd_arg(&self, name: &str, cmd: &mut std::process::Command) {
+    fn set_cmd_arg<C: clam::Command>(&self, name: &str, cmd: &mut C) {
         let mode = match self {
             InteractionMode::BatchMode => "batchmode",
             InteractionMode::NonStopMode => "nonstopmode",
@@ -99,7 +99,7 @@ pub enum MkTexFormat {
 }
 
 impl clam::ArgValue for MkTexFormat {
-    fn set_cmd_arg(&self, name: &str, cmd: &mut std::process::Command) {
+    fn set_cmd_arg<C: clam::Command>(&self, name: &str, cmd: &mut C) {
         let format = match self {
             MkTexFormat::Tex => "tex",
             MkTexFormat::Tfm => "tfm",
@@ -121,7 +121,7 @@ pub enum SrcSpecial {
 }
 
 impl clam::ArgValue for SrcSpecial {
-    fn set_cmd_arg(&self, name: &str, cmd: &mut std::process::Command) {
+    fn set_cmd_arg<C: clam::Command>(&self, name: &str, cmd: &mut C) {
         let special = match self {
             SrcSpecial::Cr => "cr",
             SrcSpecial::Display => "display",
@@ -142,7 +142,7 @@ pub enum Format {
 }
 
 impl clam::ArgValue for Format {
-    fn set_cmd_arg(&self, name: &str, cmd: &mut std::process::Command) {
+    fn set_cmd_arg<C: clam::Command>(&self, name: &str, cmd: &mut C) {
         let format = match self {
             Format::Pdf => "pdf",
             Format::Dvi => "dvi",

@@ -1,3 +1,8 @@
+//! Clam (command-line argument maker) is the opposite of Clap.
+
+// Ensure that `clam::SomeItem` resolves to the right item within expanded code
+extern crate self as clam;
+
 extern crate proc_macro;
 
 use syn::{parse_macro_input, DeriveInput};

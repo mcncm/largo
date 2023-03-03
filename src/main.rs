@@ -170,7 +170,10 @@ impl ProjectSubcommand {
     fn execute(&self, project: project::Project, conf: &LargoConfig) -> Result<()> {
         use ProjectSubcommand::*;
         match self {
-            Build(subcmd) => subcmd.try_to_build(project, conf)?.run(),
+            Build(subcmd) => {
+                // Run this inside an async runtime
+                smol::block_on(async { subcmd.try_to_build(project, conf)?.run().await })
+            }
             // the `Project` is (reasonable) proof that it is a valid project:
             // the manifest file parses. It's *reasonably* safe to delete a
             // directory if `proj` is constructed.
@@ -192,6 +195,8 @@ impl ProjectSubcommand {
                 Ok(())
             }
             Eject => todo!(),
+            // This subcommand only exists in debug builds
+            #[cfg(debug_assertions)]
             DebugProject => {
                 println!("{:#?}", project);
                 Ok(())

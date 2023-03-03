@@ -7,3 +7,8 @@ edition = "2021"
 
 [dependencies]
 clam-macro = { path = "./clam_macro" }
+async-process = { version = "*", optional = true }
+
+[features]
+default = []
+async-process = ["dep:async-process"]

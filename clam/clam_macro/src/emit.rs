@@ -69,7 +69,7 @@ pub fn generate_code(options_data: model::OptionsData) -> Result<proc_macro2::To
 
     Ok(quote! {
         impl clam::Options for #ident {
-            fn apply(self, cmd: &mut std::process::Command) {
+            fn apply<C: clam::Command>(self, cmd: &mut C) {
                 #(#apply_by_field)*
             }
         }

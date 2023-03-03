@@ -252,7 +252,7 @@ pub struct Build {
 }
 
 impl Build {
-    pub fn run(mut self) -> Result<()> {
+    pub async fn run(mut self) -> Result<()> {
         let mut child = self.cmd.spawn()?;
         child.wait()?;
         Ok(())
