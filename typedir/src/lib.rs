@@ -305,7 +305,7 @@ mod tests {
         }
     }
 
-    use proj::*;
+    use *;
 
     macro_rules! assert_path_eq {
         ($path:expr, $string:expr) => {

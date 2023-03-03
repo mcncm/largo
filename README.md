@@ -100,8 +100,11 @@ to the `inputs` of your configuration. Then the Largo binary package is in the a
 Some packages don't work "out of the box" with Largo, or need a little massaging.
 + `minted` takes a special option, `outputdir`, that can set as 
   ``` tex
-  \usepackage[outputdir=../build/\LargoProfile]{}`
+  \usepackage[outputdir=/\LargoOutputDirectory]{}`
   ```
++ `natbib` seems to disagree with `outputdir`. Some important classes---like
+  `revtex4`, used for all APS journals---preload `natbib`, so we can't just use
+  `biber` for them. This should be solvable *somehow*, but for now it's an incompatibility.
 
 ## Similar projects
 + [tectonic](https://tectonic-typesetting.github.io/en-US/) has many of the same goals. It looks pretty neat. But it also tries to reimagine more of how TeX works. It tries to implement fancy things like HTML output. It's very opinionated and cuts against the grain. I found it harder to integrate into the "rest of the world". I just wanted a tool that does what I want as simply as possible.

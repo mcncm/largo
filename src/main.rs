@@ -3,9 +3,7 @@ use clap::Parser;
 
 use largo::{
     conf::{self, LargoConfig},
-    dirs,
-    options::*,
-    project,
+    dirs, project,
 };
 
 #[derive(Debug, Parser)]
@@ -52,6 +50,7 @@ enum ProjectSubcommand {
     #[cfg(debug_assertions)]
     /// Print the project configuration
     DebugProject,
+    // This subcommand only exists in debug builds
     #[cfg(debug_assertions)]
     /// Print the build plan
     DebugBuild(BuildSubcommand),
@@ -87,10 +86,10 @@ struct InitSubcommand {
     _beamer: bool,
     #[arg(long, value_enum)]
     /// Overrides the default TeX format if set
-    system: Option<TexFormat>,
+    system: Option<conf::TexFormat>,
     #[arg(long, value_enum)]
     /// Overrides the default TeX engine if set
-    engine: Option<TexEngine>,
+    engine: Option<conf::TexEngine>,
 }
 
 #[derive(Debug, Parser)]
@@ -104,8 +103,8 @@ struct BuildSubcommand {
 }
 
 impl InitSubcommand {
-    fn project_kind(&self) -> dirs::proj::ProjectKind {
-        use dirs::proj::ProjectKind::*;
+    fn project_kind(&self) -> dirs::ProjectKind {
+        use dirs::ProjectKind::*;
         if self.doc {
             Document
         } else if self.package {
@@ -118,7 +117,7 @@ impl InitSubcommand {
     }
 
     fn execute(self, path: std::path::PathBuf) -> Result<()> {
-        let new_project = dirs::proj::NewProject {
+        let new_project = dirs::NewProject {
             name: self.name.as_str(),
             kind: self.project_kind(),
         };
@@ -177,16 +176,17 @@ impl ProjectSubcommand {
             // directory if `proj` is constructed.
             Clean { profile } => {
                 let root = project.root;
-                let build_dir = typedir::path!(root => dirs::proj::BuildDir);
+                let build_dir = typedir::path!(root => dirs::BuildDir);
                 match profile {
                     Some(profile) => {
                         let profile: crate::project::ProfileName = profile.try_into()?;
                         use typedir::Extend;
-                        let profile_dir: typedir::PathBuf<dirs::proj::ProfileBuildDir> =
+                        let profile_dir: typedir::PathBuf<dirs::ProfileBuildDir> =
                             build_dir.extend(&profile);
                         std::fs::remove_dir_all(&profile_dir)?;
                     }
                     None => {
+                        // FIXME: this seems to be printing `<disabled>`. Why?
                         std::fs::remove_dir_all(&build_dir)?;
                     }
                 }
@@ -197,6 +197,7 @@ impl ProjectSubcommand {
                 println!("{:#?}", project);
                 Ok(())
             }
+            // This subcommand only exists in debug builds
             #[cfg(debug_assertions)]
             DebugBuild(subcmd) => {
                 let build = subcmd.try_into_build(project, conf)?;
@@ -211,23 +212,22 @@ impl Subcommand {
     fn execute(self) -> Result<()> {
         match self {
             Subcommand::Create(subcmd) => subcmd.execute(),
-            Subcommand::Project(subcmd) => {
-                let project = project::Project::find()?;
-                let conf = conf::LargoConfig::new()?;
-                subcmd.execute(project, &conf)
-            }
+            Subcommand::Project(subcmd) => conf::with_config(|conf, proj| match proj {
+                Some(proj) => subcmd.execute(proj, &conf),
+                None => Err(anyhow::anyhow!("no enclosing project found")),
+            })?,
+            // This subcommand only exists in debug builds
             #[cfg(debug_assertions)]
-            Subcommand::DebugLargo => {
-                let conf = conf::LargoConfig::new()?;
+            Subcommand::DebugLargo => conf::with_config(|conf, _| {
                 println!("{:#?}", conf);
-                Ok(())
-            }
+            }),
         }
     }
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    // This option only exists in debug builds
     #[cfg(debug_assertions)]
     if cli.debug {
         println!("{:#?}", cli);

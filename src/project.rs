@@ -1,15 +1,12 @@
 use std::collections::BTreeMap;
 
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::{dirs, options};
-
-use typedir::pathref;
+use crate::{conf, dirs};
 
 #[derive(Debug)]
 pub struct Project {
-    pub root: typedir::PathBuf<dirs::proj::RootDir>,
+    pub root: typedir::PathBuf<dirs::RootDir>,
     pub config: ProjectConfig,
 }
 
@@ -40,7 +37,14 @@ pub struct PackageConfig {}
 pub struct ClassConfig {}
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(transparent)]
 pub struct ProfileName(String);
+
+impl Default for ProfileName {
+    fn default() -> Self {
+        Self(crate::conf::DEBUG_PROFILE.to_string())
+    }
+}
 
 impl AsRef<str> for ProfileName {
     fn as_ref(&self) -> &str {
@@ -86,14 +90,14 @@ pub struct Profile {
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct SystemSettings {
-    pub tex_format: Option<options::TexFormat>,
-    pub tex_engine: Option<options::TexEngine>,
-    pub bib_engine: Option<options::BibEngine>,
+    pub tex_format: Option<conf::TexFormat>,
+    pub tex_engine: Option<conf::TexEngine>,
+    pub bib_engine: Option<conf::BibEngine>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct ProjectSettings {
-    pub output_format: Option<options::OutputFormat>,
+    pub output_format: Option<conf::OutputFormat>,
     pub shell_escape: Option<bool>,
 }
 
@@ -162,22 +166,4 @@ impl<'a> IntoIterator for &'a Dependencies {
 #[serde(rename_all = "kebab-case")]
 pub enum Dependency {
     Path { path: String },
-}
-
-impl Project {
-    pub fn find() -> Result<Self> {
-        use dirs::proj::*;
-        let mut root = RootDir::find()?;
-        let conf: ProjectConfig = {
-            let path = pathref!(root => ConfigFile);
-            config::Config::builder()
-                .add_source(config::File::new(
-                    path.to_str().expect("non-UTF-8 path or something"),
-                    config::FileFormat::Toml,
-                ))
-                .build()?
-                .try_deserialize()?
-        };
-        Ok(Self { root, config: conf })
-    }
 }

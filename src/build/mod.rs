@@ -22,8 +22,8 @@ impl AsRef<OsStr> for TexInput {
 #[derive(Debug)]
 struct LargoVars<'a> {
     profile: &'a ProfileName,
-    bibliography: &'a Option<String>,
-    output_directory: P<dirs::proj::ProfileBuildDir>,
+    bibliography: Option<&'a str>,
+    output_directory: P<dirs::ProfileBuildDir>,
 }
 
 // For use in `LargoVars::to_defs`
@@ -39,7 +39,7 @@ impl<'a> LargoVars<'a> {
         let root_dir = settings.root_dir.clone();
         Self {
             profile: &settings.profile_name,
-            bibliography: &settings.conf.default_bibliography,
+            bibliography: settings.conf.default_bibliography,
             output_directory: root_dir.extend(()).extend(settings.profile_name),
         }
     }
@@ -61,7 +61,7 @@ impl<'a> LargoVars<'a> {
 
 fn tex_input(largo_vars: LargoVars, _conf: &LargoConfig) -> TexInput {
     let vars = largo_vars.to_defs();
-    let main_file = dirs::proj::MAIN_FILE;
+    let main_file = dirs::MAIN_FILE;
     TexInput(format!(r#"{vars}\input{{{main_file}}}"#))
 }
 
@@ -122,7 +122,7 @@ pub enum Verbosity {
 }
 
 pub struct BuildBuilder<'a> {
-    conf: &'a LargoConfig,
+    conf: &'a LargoConfig<'a>,
     project: Project,
     verbosity: Verbosity,
     /// Which profile to build in
@@ -184,8 +184,8 @@ impl<'a> BuildBuilder<'a> {
 /// An intermediate state of unpackaging and treating all the data we've
 /// received
 struct BuildSettings<'a> {
-    conf: &'a LargoConfig,
-    root_dir: P<dirs::proj::RootDir>,
+    conf: &'a LargoConfig<'a>,
+    root_dir: P<dirs::RootDir>,
     profile_name: &'a ProfileName,
     system_settings: SystemSettings,
     project_settings: ProjectSettings,
@@ -234,7 +234,7 @@ impl<'a> BuildSettings<'a> {
             }
         }
         {
-            let src_dir: R<dirs::proj::SrcDir> = (&mut self.root_dir).extend(());
+            let src_dir: R<dirs::SrcDir> = (&mut self.root_dir).extend(());
             cmd.current_dir(src_dir);
         }
         for (var, val) in build_vars.0 {
@@ -254,7 +254,7 @@ impl<'a> BuildSettings<'a> {
         pdflatex_options.interaction = Some(crate::engines::pdflatex::InteractionMode::NonStopMode);
         use clam::Options;
         pdflatex_options.apply(&mut cmd);
-        let build_dir: P<dirs::proj::ProfileBuildDir> =
+        let build_dir: P<dirs::ProfileBuildDir> =
             self.root_dir.extend(()).extend(self.profile_name);
         std::fs::create_dir_all(&build_dir).expect("TODO: Sorry, this code needs to be refactored; it's a waste of time to handle this error.");
         match &self.project_settings.shell_escape {

@@ -6,12 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "4.0.27", features = [ "derive" ] }
-config = "0.13.2"
+clap = { version = "4.0", features = [ "derive" ] }
 serde = { version = "1.0", features = [ "derive" ] }
 toml = { version = "0.5.9", features = [ "preserve_order" ] }
+chrono = { version = "0.4" }
 thiserror = "1.0"
 anyhow = "1.0"
 typedir = { path = "./typedir" }
 clam = { path = "./clam" }
-chrono = { version = "0.4" }
