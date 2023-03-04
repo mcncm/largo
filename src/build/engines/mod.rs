@@ -1,6 +1,6 @@
 use crate::dirs;
 
-use smol::prelude::*;
+use smol::{io::BufReader, process::ChildStdout};
 
 pub mod pdflatex;
 
@@ -12,17 +12,11 @@ pub struct Engine {
 }
 
 impl Engine {
-    pub async fn run(&mut self) -> anyhow::Result<()> {
+    pub fn run(&mut self) -> anyhow::Result<BufReader<ChildStdout>> {
         // `async_process::Child` does not require a manual call to `.wait()`.
         let mut child = self.cmd.spawn()?;
         let stdout = child.stdout.take().expect("failed to take child's stdout");
-
-        let mut lines = smol::io::BufReader::new(stdout).lines();
-        while let Some(line) = lines.next().await {
-            println!("{}", line?);
-        }
-
-        Ok(())
+        Ok(smol::io::BufReader::new(stdout))
     }
 }
 

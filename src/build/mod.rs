@@ -71,12 +71,14 @@ impl BuildVars {
 }
 
 /// Level of severity of information to forward from TeX engine
+#[derive(Debug, Default)]
 pub enum LogLevel {
+    #[default]
     Warning,
     Error,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub enum Verbosity {
     /// Never emit anything, even on failure
     #[default]
@@ -194,19 +196,41 @@ impl<'a> BuildSettings<'a> {
 
     fn to_build(self) -> Result<Build> {
         let engine = self.get_engine()?;
-        Ok(Build { engine })
+        Ok(Build {
+            verbosity: self.verbosity,
+            engine,
+        })
     }
 }
 
 #[derive(Debug)]
 pub struct Build {
-    // FIXME this absolutely should not be public
-    pub engine: engines::Engine,
+    verbosity: Verbosity,
+    engine: engines::Engine,
 }
 
 impl Build {
     pub async fn run(mut self) -> Result<()> {
-        self.engine.run().await?;
+        self.run_engine().await?;
+        Ok(())
+    }
+
+    pub async fn run_engine(&mut self) -> Result<()> {
+        use smol::prelude::*;
+        let stdout = self.engine.run()?;
+        let mut lines = stdout.lines();
+        if matches!(self.verbosity, Verbosity::Noisy) {
+            while let Some(line) = lines.next().await {
+                println!("{}", line?);
+            }
+        } else {
+            while let Some(line) = lines.next().await {
+                let line = line?;
+                if line.starts_with("!") {
+                    println!("{}", line);
+                }
+            }
+        }
         Ok(())
     }
 }
