@@ -88,15 +88,13 @@ impl<'c> Profiles<'c> {
 pub struct Profile {
     #[serde(flatten)]
     pub project_settings: ProjectSettings,
-    #[serde(flatten)]
-    pub system_settings: SystemSettings,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct SystemSettings {
-    pub tex_format: Option<conf::TexFormat>,
-    pub tex_engine: Option<conf::TexEngine>,
+    pub tex_format: conf::TexFormat,
+    pub tex_engine: conf::TexEngine,
     pub bib_engine: Option<conf::BibEngine>,
 }
 
@@ -111,16 +109,6 @@ pub struct ProjectSettings {
     /// compiled document
     #[serde(default)]
     pub synctex: bool,
-}
-
-impl SystemSettings {
-    pub fn merge(self, other: Self) -> Self {
-        Self {
-            tex_format: self.tex_format.or(other.tex_format),
-            tex_engine: self.tex_engine.or(other.tex_engine),
-            bib_engine: self.bib_engine.or(other.bib_engine),
-        }
-    }
 }
 
 impl ProjectSettings {

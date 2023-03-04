@@ -1,77 +1,117 @@
 use serde::Serialize;
 
-use crate::{build::Verbosity, dirs};
+use super::{private::CommandBuilder, Engine, EngineBuilder};
+use crate::dirs;
 
 pub struct PdflatexBuilder {
     cmd: crate::build::Command,
-    tex_input: crate::build::TexInput,
-    // FIXME: Not really the right type here
-    verbosity: Verbosity,
-    pub cli_options: CommandLineOptions,
+    /// The `\input{main.tex}` that should terminate the tex input
+    input: String,
+    cli_options: CommandLineOptions,
+}
+
+impl CommandBuilder for PdflatexBuilder {
+    fn inner_cmd(&self) -> &crate::build::Command {
+        &self.cmd
+    }
+
+    fn inner_cmd_mut(&mut self) -> &mut crate::build::Command {
+        &mut self.cmd
+    }
 }
 
 impl PdflatexBuilder {
-    pub fn new<E: AsRef<std::ffi::OsStr>>(
-        executable: E,
-        tex_input: crate::build::TexInput,
-    ) -> Self {
-        let cmd = crate::build::Command::new(executable);
+    // NOTE: Only using `conf` just to find its own executable. In fact, it
+    // should probably be using some _other_ input; that's more data than it
+    // should have access to.
+    pub fn new(conf: &crate::conf::LargoConfig) -> Self {
+        let cmd = crate::build::Command::new(&conf.executables.pdflatex);
         let mut cli_options = CommandLineOptions::default();
         // Always use nonstop mode for now.
-        cli_options.interaction = Some(crate::engines::pdflatex::InteractionMode::NonStopMode);
+        cli_options.interaction = Some(InteractionMode::NonStopMode);
         Self {
             cmd,
-            tex_input,
             cli_options,
-            verbosity: Verbosity::default(),
+            input: String::new(),
         }
     }
 
-    pub fn with_src_dir<P: typedir::AsPath<dirs::SrcDir>>(mut self, dir: P) -> Self {
-        self.cmd.current_dir(dir);
+    fn disable_line_wrapping(&mut self) {
+        // FIXME: you should be able to do this as a static converstion to a
+        // &'static str, and without an allocation.
+        self.cmd.env("max_print_line", &i32::MAX.to_string());
+    }
+
+    fn finish_input(&mut self) {
+        self.input.push_str(r#"\input{"#);
+        self.input.push_str(dirs::MAIN_FILE);
+        self.input.push('}');
+    }
+}
+
+impl EngineBuilder for PdflatexBuilder {
+    fn with_output_dir<P: typedir::AsPath<dirs::ProfileBuildDir>>(mut self, path: P) -> Self {
+        self.cli_options.output_directory = Some(path.to_path_buf());
         self
     }
 
-    pub fn with_verbosity(mut self, verbosity: Verbosity) -> Self {
-        self.verbosity = verbosity;
+    fn with_verbosity(self, _verbosity: &crate::build::Verbosity) -> Self {
+        // FIXME: just a no-op for now
         self
     }
 
-    pub fn with_build_vars(mut self, build_vars: &crate::build::BuildVars) -> Self {
-        build_vars.apply(&mut self.cmd);
-        self
-    }
-
-    pub fn with_synctex(mut self, use_synctex: bool) -> Self {
+    fn with_synctex(mut self, use_synctex: bool) -> anyhow::Result<Self> {
         if use_synctex {
             self.cli_options.synctex = Some(SYNCTEX_GZIPPED);
         }
-        self
+        Ok(self)
     }
 
-    pub fn finalize(self) -> crate::build::Build {
-        let mut cmd = self.cmd;
-        // What to do with the output
-        match &self.verbosity {
-            Verbosity::Silent => {
-                cmd.stdout(std::process::Stdio::null());
-            }
-            Verbosity::Info(_log_level) => {
-                // What do we do here? Custom pipe?
-                todo!();
-            }
-            Verbosity::Noisy => {
-                // Don't have to do anything, inheriting stdout
-            }
+    // FIXME: Just do this with macros.
+    fn with_largo_vars(mut self, vars: &crate::vars::LargoVars) -> anyhow::Result<Self> {
+        use std::fmt::Write;
+        write!(self.input, r#"\def\LargoProfile{{{}}}"#, vars.profile)?;
+        write!(
+            self.input,
+            r#"\def\LargoOutputDirectory{{{}}}"#,
+            vars.output_directory.display()
+        )?;
+        if let Some(bib) = &vars.bibliography {
+            write!(self.input, r#"\def\LargoBibliography{{{}}}"#, bib)?;
         }
+        Ok(self)
+    }
+
+    fn with_shell_escape(mut self, shell_escape: Option<bool>) -> anyhow::Result<Self> {
+        match shell_escape {
+            Some(true) => {
+                self.cli_options.shell_escape = true;
+            }
+            Some(false) => {
+                self.cli_options.no_shell_escape = true;
+            }
+            None => (),
+        }
+        Ok(self)
+    }
+
+    fn finish(mut self) -> Engine {
+        self.disable_line_wrapping();
+        self.finish_input();
+
+        let mut cmd = self.cmd;
+        cmd.stderr(smol::process::Stdio::piped())
+            .stdout(smol::process::Stdio::piped());
+        // What to do with the output
         clam::Options::apply(self.cli_options, &mut cmd);
         // The actual input to the tex program
-        cmd.arg(self.tex_input);
-        crate::build::Build { cmd }
+        cmd.arg(&self.input);
+        Engine { cmd }
     }
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[allow(unused)]
 pub enum InteractionMode {
     BatchMode,
     NonStopMode,
@@ -92,6 +132,7 @@ impl clam::ArgValue for InteractionMode {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[allow(unused)]
 pub enum MkTexFormat {
     Tex,
     Tfm,
@@ -110,6 +151,7 @@ impl clam::ArgValue for MkTexFormat {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[allow(unused)]
 pub enum SrcSpecial {
     Cr,
     Display,
@@ -136,6 +178,7 @@ impl clam::ArgValue for SrcSpecial {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[allow(unused)]
 pub enum Format {
     Pdf,
     Dvi,
@@ -160,6 +203,7 @@ pub type SynctexNumber = i32;
 
 pub const SYNCTEX_GZIPPED: SynctexNumber = 1;
 
+#[allow(unused)]
 pub const SYNCTEX_UNZIPPED: SynctexNumber = -1;
 
 /// Kpathsea debug option type
@@ -188,7 +232,7 @@ pub struct CommandLineOptions {
     /// be pdfinitex, for dumping formats; this is implicitly true if the program name is `pdfinitex'
     ini: bool,
     /// set interaction mode (STRING=batchmode/nonstopmode/scrollmode/errorstopmode)
-    pub interaction: Option<InteractionMode>,
+    interaction: Option<InteractionMode>,
     /// send DVI output to a socket as well as the usual output file
     ipc: bool,
     /// as -ipc, and also start the server at the other end
@@ -206,7 +250,7 @@ pub struct CommandLineOptions {
     /// use STRING for DVI file comment instead of date (no effect for PDF)
     output_comment: Option<String>,
     /// use existing DIR as the directory to write files in
-    pub output_directory: Option<std::path::PathBuf>,
+    output_directory: Option<std::path::PathBuf>,
     /// use FORMAT for job output; FORMAT is `dvi' or `pdf'
     output_format: Option<Format>,
     /// enable parsing of first line of input file
@@ -218,9 +262,9 @@ pub struct CommandLineOptions {
     /// enable filename recorder
     recorder: bool,
     /// enable \write18{SHELL COMMAND}
-    pub shell_escape: bool,
+    shell_escape: bool,
     /// disable \write18{SHELL COMMAND}
-    pub no_shell_escape: bool,
+    no_shell_escape: bool,
     /// enable restricted \write18
     shell_restricted: bool,
     /// insert source specials in certain places of the DVI file. WHERE is a comma-separated value list: cr display hbox math par parend vbox

@@ -1,41 +1,17 @@
-use std::collections::BTreeMap;
-use std::ffi::OsStr;
-
 use anyhow::{anyhow, Result};
 pub use smol::process::Command;
+use std::collections::BTreeMap;
 
-use thiserror::__private::PathAsDisplay;
 use typedir::{Extend, PathBuf as P};
 
-use crate::conf::{self, LargoConfig};
+use crate::conf::LargoConfig;
+use crate::dirs;
 use crate::project::{self, Dependencies, ProfileName, Project, ProjectSettings, SystemSettings};
-use crate::{dirs, engines};
+use crate::vars::LargoVars;
 
-// Probably shouldn't really be public: currently is just for PdflatexBuilder's sake
-pub struct TexInput(String);
+mod engines;
 
-impl AsRef<OsStr> for TexInput {
-    fn as_ref(&self) -> &OsStr {
-        self.0.as_ref()
-    }
-}
-
-/// Variables available at TeX run time
-#[derive(Debug)]
-struct LargoVars<'a> {
-    profile: ProfileName<'a>,
-    bibliography: Option<&'a str>,
-    output_directory: P<dirs::ProfileBuildDir>,
-}
-
-// For use in `LargoVars::to_defs`
-macro_rules! write_lv {
-    ($defs:expr, $var:expr, $val:expr) => {
-        write!($defs, r#"\def\Largo{}{{{}}}"#, $var, $val).expect("internal error");
-    };
-}
-
-impl<'a> LargoVars<'a> {
+impl<'a> crate::vars::LargoVars<'a> {
     fn from_build_settings(settings: &'a BuildSettings<'a>) -> Self {
         // NOTE: unfortunate clone
         let root_dir = settings.root_dir.clone();
@@ -45,32 +21,13 @@ impl<'a> LargoVars<'a> {
             output_directory: root_dir.extend(()).extend(&settings.profile_name),
         }
     }
-
-    fn to_defs(self) -> String {
-        use std::fmt::Write;
-        let mut defs = String::new();
-        {
-            let defs = &mut defs;
-            write_lv!(defs, "Profile", &self.profile);
-            if let Some(bib) = self.bibliography {
-                write_lv!(defs, "Bibliography", bib);
-            }
-            write_lv!(defs, "OutputDirectory", &self.output_directory.as_display());
-        }
-        defs
-    }
-}
-
-fn tex_input(largo_vars: LargoVars, _conf: &LargoConfig) -> TexInput {
-    let vars = largo_vars.to_defs();
-    let main_file = dirs::MAIN_FILE;
-    TexInput(format!(r#"{vars}\input{{{main_file}}}"#))
 }
 
 /// Environment variables for the build command
 #[derive(Debug, Default)]
 pub struct BuildVars(BTreeMap<&'static str, String>);
 
+#[allow(dead_code)]
 impl BuildVars {
     fn new() -> Self {
         Self(BTreeMap::new())
@@ -81,6 +38,7 @@ impl BuildVars {
     }
 }
 
+#[allow(dead_code)]
 impl BuildVars {
     fn with_dependencies(mut self, deps: &project::Dependencies) -> Self {
         let mut tex_inputs = String::new();
@@ -170,15 +128,14 @@ impl<'a> BuildBuilder<'a> {
             .ok_or_else(|| anyhow!("profile `{}` not found", profile_name))?;
         let proj_conf = project.config.project;
         let project_settings = proj_conf.project_settings.merge(profile.project_settings);
-        let system_settings = proj_conf.system_settings.merge(profile.system_settings);
-        let dependencies = project.config.dependencies;
+        let _dependencies = project.config.dependencies;
         Ok(BuildSettings {
             conf,
             root_dir,
             profile_name,
-            system_settings,
+            system_settings: proj_conf.system_settings,
             project_settings,
-            dependencies,
+            _dependencies,
             verbosity: self.verbosity,
         })
     }
@@ -197,65 +154,59 @@ struct BuildSettings<'a> {
     profile_name: ProfileName<'a>,
     system_settings: SystemSettings,
     project_settings: ProjectSettings,
-    dependencies: Dependencies<'a>,
+    _dependencies: Dependencies<'a>,
     verbosity: Verbosity,
 }
 
 impl<'a> BuildSettings<'a> {
-    fn executable(&self) -> &conf::Executable {
-        let engine = self
-            .system_settings
-            .tex_engine
-            .unwrap_or(self.conf.default_tex_engine);
-        let system = self
-            .system_settings
-            .tex_format
-            .unwrap_or(self.conf.default_tex_format);
-        self.conf.choose_program(engine, system)
+    fn engine_builder(&self) -> engines::pdflatex::PdflatexBuilder {
+        let tex_engine = &self.system_settings.tex_engine;
+        let tex_format = &self.system_settings.tex_format;
+        match (tex_engine, tex_format) {
+            (crate::conf::TexEngine::Pdftex, crate::conf::TexFormat::Latex) => {
+                engines::pdflatex::PdflatexBuilder::new(&self.conf)
+            }
+            (_, _) => {
+                unimplemented!();
+            }
+        }
     }
 
-    fn build_vars(&self) -> BuildVars {
-        BuildVars::new()
-            .with_dependencies(&self.dependencies)
-            .disable_line_wrapping()
-    }
-
-    fn to_build(mut self) -> Result<Build> {
-        let largo_vars = LargoVars::from_build_settings(&self);
-        let tex_input = tex_input(largo_vars, self.conf);
-        let mut plb = engines::pdflatex::PdflatexBuilder::new(self.executable(), tex_input)
-            .with_src_dir((&mut self.root_dir).extend(()))
-            .with_build_vars(&self.build_vars())
-            .with_verbosity(self.verbosity)
-            .with_synctex(self.project_settings.synctex);
+    fn get_engine(&self) -> Result<engines::Engine> {
+        use engines::EngineBuilder;
+        let mut root_dir = self.root_dir.clone();
         let build_dir: P<dirs::ProfileBuildDir> =
-            self.root_dir.extend(()).extend(&self.profile_name);
+            self.root_dir.clone().extend(()).extend(&self.profile_name);
         // FIXME this should happen *at build time*, right?
         std::fs::create_dir_all(&build_dir).expect("TODO: Sorry, this code needs to be refactored; it's a waste of time to handle this error.");
-        plb.cli_options.output_directory = Some(build_dir.into());
-        match self.project_settings.shell_escape {
-            Some(true) => {
-                plb.cli_options.shell_escape = true;
-            }
-            Some(false) => {
-                plb.cli_options.no_shell_escape = true;
-            }
-            None => (),
-        };
-        Ok(plb.finalize())
+        let largo_vars = LargoVars::from_build_settings(&self);
+        let eng = self
+            .engine_builder()
+            .with_src_dir((&mut root_dir).extend(()))
+            .with_output_dir(build_dir)
+            .with_verbosity(&self.verbosity)
+            .with_largo_vars(&largo_vars)?
+            .with_synctex(self.project_settings.synctex)?
+            .with_shell_escape(self.project_settings.shell_escape)?
+            .finish();
+        Ok(eng)
+    }
+
+    fn to_build(self) -> Result<Build> {
+        let engine = self.get_engine()?;
+        Ok(Build { engine })
     }
 }
 
 #[derive(Debug)]
 pub struct Build {
     // FIXME this absolutely should not be public
-    pub cmd: Command,
+    pub engine: engines::Engine,
 }
 
 impl Build {
     pub async fn run(mut self) -> Result<()> {
-        self.cmd.spawn()?;
-        // `async_process::Child` does not require a manual call to `.wait()`.
+        self.engine.run().await?;
         Ok(())
     }
 }
