@@ -124,6 +124,7 @@ impl ProjectSettings {
 }
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(transparent)]
 pub struct DependencyName<'c>(&'c str);
 
 impl<'c> AsRef<str> for DependencyName<'c> {
@@ -167,6 +168,18 @@ impl<'a> IntoIterator for &'a Dependencies<'a> {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum Dependency<'c> {
-    Path { path: &'c str },
+pub struct Dependency<'c> {
+    #[serde(default)]
+    pub largo: bool,
+    #[serde(flatten, borrow)]
+    pub kind: DependencyKind<'c>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", untagged)]
+pub enum DependencyKind<'c> {
+    Path {
+        #[serde(borrow)]
+        path: &'c std::path::Path,
+    },
 }

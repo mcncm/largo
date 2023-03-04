@@ -4,6 +4,8 @@ use smol::{io::BufReader, process::ChildStdout};
 
 pub mod pdflatex;
 
+pub type DependencyPaths = Vec<std::path::PathBuf>;
+
 /// A TeX engine
 #[derive(Debug)]
 pub struct Engine {
@@ -49,6 +51,15 @@ pub trait EngineBuilder: private::CommandBuilder + Sized {
     /// flags, `-shell-escape` and `-no-shell-escape`, and I'm not sure they
     /// aren't simple opposites.
     fn with_shell_escape(self, shell_escape: Option<bool>) -> anyhow::Result<Self>;
+
+    fn with_dependencies(mut self, deps: &DependencyPaths) -> Self {
+        use itertools::Itertools;
+        if !deps.is_empty() {
+            let tex_inputs = format!("{}", deps.iter().map(|p| p.display()).format(","));
+            self.inner_cmd_mut().env("TEXINPUTS", tex_inputs);
+        }
+        self
+    }
 
     fn finish(self) -> Engine;
 }

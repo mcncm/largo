@@ -1,12 +1,11 @@
 use anyhow::{anyhow, Result};
 pub use smol::process::Command;
-use std::collections::BTreeMap;
 
 use typedir::{Extend, PathBuf as P};
 
 use crate::conf::LargoConfig;
 use crate::dirs;
-use crate::project::{self, Dependencies, ProfileName, Project, ProjectSettings, SystemSettings};
+use crate::project::{Dependencies, ProfileName, Project, ProjectSettings, SystemSettings};
 use crate::vars::LargoVars;
 
 mod engines;
@@ -19,53 +18,6 @@ impl<'a> crate::vars::LargoVars<'a> {
             profile: settings.profile_name,
             bibliography: settings.conf.default_bibliography,
             output_directory: root_dir.extend(()).extend(&settings.profile_name),
-        }
-    }
-}
-
-/// Environment variables for the build command
-#[derive(Debug, Default)]
-pub struct BuildVars(BTreeMap<&'static str, String>);
-
-#[allow(dead_code)]
-impl BuildVars {
-    fn new() -> Self {
-        Self(BTreeMap::new())
-    }
-
-    fn insert<V: std::fmt::Display>(&mut self, k: &'static str, v: V) {
-        self.0.insert(k, format!("{}", v));
-    }
-}
-
-#[allow(dead_code)]
-impl BuildVars {
-    fn with_dependencies(mut self, deps: &project::Dependencies) -> Self {
-        let mut tex_inputs = String::new();
-        for (_dep_name, dep_body) in deps {
-            match &dep_body {
-                project::Dependency::Path { path } => {
-                    tex_inputs += &path;
-                    tex_inputs.push(':');
-                }
-            }
-        }
-        if !tex_inputs.is_empty() {
-            self.insert("TEXINPUTS", tex_inputs);
-        }
-        self
-    }
-
-    /// NOTE: there seems to be no way to *actually* turn off line wrapping from
-    /// pdflatex, but we can fake it by wrapping at a very high column number.
-    fn disable_line_wrapping(mut self) -> Self {
-        self.insert("max_print_line", i32::MAX);
-        self
-    }
-
-    pub fn apply(&self, cmd: &mut Command) {
-        for (var, val) in &self.0 {
-            cmd.env(var, val);
         }
     }
 }
@@ -118,7 +70,7 @@ impl<'a> BuildBuilder<'a> {
     }
 
     /// Unpack the data we've been passed into a more convenient shape
-    fn to_build_settings(self) -> Result<BuildSettings<'a>> {
+    fn finish(self) -> Result<BuildSettings<'a>> {
         let conf = self.conf;
         let project = self.project;
         let root_dir = project.root;
@@ -130,20 +82,20 @@ impl<'a> BuildBuilder<'a> {
             .ok_or_else(|| anyhow!("profile `{}` not found", profile_name))?;
         let proj_conf = project.config.project;
         let project_settings = proj_conf.project_settings.merge(profile.project_settings);
-        let _dependencies = project.config.dependencies;
+        let dependencies = project.config.dependencies;
         Ok(BuildSettings {
             conf,
             root_dir,
             profile_name,
             system_settings: proj_conf.system_settings,
             project_settings,
-            _dependencies,
+            dependencies,
             verbosity: self.verbosity,
         })
     }
 
     pub fn try_finish(self) -> Result<Build> {
-        let build_settings = self.to_build_settings()?;
+        let build_settings = self.finish()?;
         build_settings.to_build()
     }
 }
@@ -156,7 +108,7 @@ struct BuildSettings<'a> {
     profile_name: ProfileName<'a>,
     system_settings: SystemSettings,
     project_settings: ProjectSettings,
-    _dependencies: Dependencies<'a>,
+    dependencies: Dependencies<'a>,
     verbosity: Verbosity,
 }
 
@@ -190,6 +142,9 @@ impl<'a> BuildSettings<'a> {
             .with_largo_vars(&largo_vars)?
             .with_synctex(self.project_settings.synctex)?
             .with_shell_escape(self.project_settings.shell_escape)?
+            .with_dependencies(&crate::dependencies::get_dependency_paths(
+                &self.dependencies,
+            ))
             .finish();
         Ok(eng)
     }
