@@ -1,14 +1,12 @@
 use anyhow::{anyhow, Result};
-pub use smol::process::Command;
 
 use typedir::{Extend, PathBuf as P};
 
 use crate::conf::LargoConfig;
 use crate::dirs;
+use crate::engines;
 use crate::project::{Dependencies, ProfileName, Project, ProjectSettings, SystemSettings};
 use crate::vars::LargoVars;
-
-mod engines;
 
 impl<'a> crate::vars::LargoVars<'a> {
     fn from_build_settings(settings: &'a BuildSettings<'a>) -> Self {

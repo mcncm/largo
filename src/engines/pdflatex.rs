@@ -4,18 +4,18 @@ use super::{private::CommandBuilder, Engine, EngineBuilder};
 use crate::dirs;
 
 pub struct PdflatexBuilder {
-    cmd: crate::build::Command,
+    cmd: crate::Command,
     /// The `\input{main.tex}` that should terminate the tex input
     input: String,
     cli_options: CommandLineOptions,
 }
 
 impl CommandBuilder for PdflatexBuilder {
-    fn inner_cmd(&self) -> &crate::build::Command {
+    fn inner_cmd(&self) -> &crate::Command {
         &self.cmd
     }
 
-    fn inner_cmd_mut(&mut self) -> &mut crate::build::Command {
+    fn inner_cmd_mut(&mut self) -> &mut crate::Command {
         &mut self.cmd
     }
 }
@@ -25,7 +25,7 @@ impl PdflatexBuilder {
     // should probably be using some _other_ input; that's more data than it
     // should have access to.
     pub fn new(conf: &crate::conf::LargoConfig) -> Self {
-        let cmd = crate::build::Command::new(&conf.executables.pdflatex);
+        let cmd = crate::Command::new(&conf.executables.pdflatex);
         let mut cli_options = CommandLineOptions::default();
         // Always use nonstop mode for now.
         cli_options.interaction = Some(InteractionMode::NonStopMode);

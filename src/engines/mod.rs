@@ -1,4 +1,4 @@
-use crate::dirs;
+use crate::{build, dirs};
 
 use smol::{io::BufReader, process::ChildStdout};
 
@@ -10,7 +10,7 @@ pub type DependencyPaths = Vec<std::path::PathBuf>;
 #[derive(Debug)]
 pub struct Engine {
     /// Internal command
-    cmd: super::Command,
+    cmd: crate::Command,
 }
 
 impl Engine {
@@ -41,7 +41,7 @@ pub trait EngineBuilder: private::CommandBuilder + Sized {
 
     fn with_output_dir<P: typedir::AsPath<dirs::ProfileBuildDir>>(self, path: P) -> Self;
 
-    fn with_verbosity(self, verbosity: &super::Verbosity) -> Self;
+    fn with_verbosity(self, verbosity: &build::Verbosity) -> Self;
 
     fn with_synctex(self, use_synctex: bool) -> anyhow::Result<Self>;
 
