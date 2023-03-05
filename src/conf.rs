@@ -1,6 +1,6 @@
 //! Tool configuration
 
-use anyhow::Result;
+use crate::Result;
 use serde::{Deserialize, Serialize};
 
 use crate::dirs::{self, ContentString as S};

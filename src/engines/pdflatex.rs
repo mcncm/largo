@@ -60,7 +60,7 @@ impl EngineBuilder for PdflatexBuilder {
         self
     }
 
-    fn with_synctex(mut self, use_synctex: bool) -> anyhow::Result<Self> {
+    fn with_synctex(mut self, use_synctex: bool) -> crate::Result<Self> {
         if use_synctex {
             self.cli_options.synctex = Some(SYNCTEX_GZIPPED);
         }
@@ -68,7 +68,7 @@ impl EngineBuilder for PdflatexBuilder {
     }
 
     // FIXME: Just do this with macros.
-    fn with_largo_vars(mut self, vars: &crate::vars::LargoVars) -> anyhow::Result<Self> {
+    fn with_largo_vars(mut self, vars: &crate::vars::LargoVars) -> crate::Result<Self> {
         use std::fmt::Write;
         write!(self.input, r#"\def\LargoProfile{{{}}}"#, vars.profile)?;
         write!(
@@ -82,7 +82,7 @@ impl EngineBuilder for PdflatexBuilder {
         Ok(self)
     }
 
-    fn with_shell_escape(mut self, shell_escape: Option<bool>) -> anyhow::Result<Self> {
+    fn with_shell_escape(mut self, shell_escape: Option<bool>) -> crate::Result<Self> {
         match shell_escape {
             Some(true) => {
                 self.cli_options.shell_escape = true;

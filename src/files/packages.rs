@@ -63,7 +63,7 @@ impl PackageDate {
 pub struct IdentBanner(String);
 
 impl TryFrom<String> for IdentBanner {
-    type Error = anyhow::Error;
+    type Error = crate::Error;
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
         if s.contains("Standard LaTeX") {

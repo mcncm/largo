@@ -63,7 +63,7 @@ impl<'c> std::fmt::Display for ProfileName<'c> {
 }
 
 impl<'c> TryFrom<&'c str> for ProfileName<'c> {
-    type Error = anyhow::Error;
+    type Error = crate::Error;
 
     fn try_from(s: &'c str) -> std::result::Result<Self, Self::Error> {
         Ok(Self(s))
@@ -140,7 +140,7 @@ impl<'c> std::fmt::Display for DependencyName<'c> {
 }
 
 impl<'c> TryFrom<&'c str> for DependencyName<'c> {
-    type Error = anyhow::Error;
+    type Error = crate::Error;
 
     fn try_from(s: &'c str) -> std::result::Result<Self, Self::Error> {
         Ok(Self(s))
