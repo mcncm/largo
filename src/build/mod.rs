@@ -166,7 +166,8 @@ pub struct Build {
 
 impl Build {
     pub async fn run(mut self) -> Result<()> {
-        self.run_engine().await?;
+        let (_, dur) = crate::util::timed_async(|| async { self.run_engine().await }).await;
+        println!("ran in {:.2}s.", dur.as_secs_f32());
         Ok(())
     }
 
