@@ -5,7 +5,6 @@ pub mod dependencies;
 pub mod dirs;
 pub mod engines;
 pub mod files;
-pub mod project;
 pub mod util;
 pub mod vars;
 

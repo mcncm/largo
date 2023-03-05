@@ -1,6 +1,6 @@
 use clap::Parser;
 
-use crate::{build, conf, dirs, project, Result};
+use crate::{build, conf, dirs, Result};
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -154,7 +154,7 @@ impl CreateSubcommand {
 impl BuildSubcommand {
     fn try_to_build(
         &self,
-        project: project::Project,
+        project: conf::Project,
         conf: &conf::LargoConfig,
     ) -> Result<build::Build> {
         let profile = match &self.profile {
@@ -174,7 +174,7 @@ impl BuildSubcommand {
 }
 
 impl ProjectSubcommand {
-    fn execute(&self, project: project::Project, conf: &conf::LargoConfig) -> Result<()> {
+    fn execute(&self, project: conf::Project, conf: &conf::LargoConfig) -> Result<()> {
         use ProjectSubcommand::*;
         match self {
             Build(subcmd) => {
@@ -189,7 +189,7 @@ impl ProjectSubcommand {
                 let build_dir = typedir::path!(root => dirs::BuildDir);
                 match &profile {
                     Some(profile) => {
-                        let profile: crate::project::ProfileName = profile.as_str().try_into()?;
+                        let profile: crate::conf::ProfileName = profile.as_str().try_into()?;
                         use typedir::Extend;
                         let profile_dir: typedir::PathBuf<dirs::ProfileBuildDir> =
                             build_dir.extend(&profile);

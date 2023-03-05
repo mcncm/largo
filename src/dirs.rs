@@ -1,4 +1,4 @@
-use crate::project;
+use crate::conf;
 use anyhow::{anyhow, Result};
 use typedir::{path, pathref, AsPath, Extend, PathBuf as P, PathRef as R};
 
@@ -40,7 +40,7 @@ typedir::typedir! {
             forall s: &str, s => node SrcFile;
         };
         BUILD_DIR => node BuildDir {
-            forall s: &crate::project::ProfileName<'_>, s.as_ref() => node ProfileBuildDir;
+            forall s: &crate::conf::ProfileName<'_>, s.as_ref() => node ProfileBuildDir;
         };
         GIT_DIR => node GitDir;
         GITIGNORE => node Gitignore;
@@ -67,25 +67,25 @@ pub struct NewProject<'a> {
 }
 
 impl<'a> NewProject<'a> {
-    fn project_toml(&self) -> project::ProjectConfig {
+    fn project_toml(&self) -> conf::ProjectConfig {
         let package = match self.kind {
-            ProjectKind::Package => Some(project::PackageConfig::default()),
+            ProjectKind::Package => Some(conf::PackageConfig::default()),
             _ => None,
         };
         let class = match self.kind {
-            ProjectKind::Class => Some(project::ClassConfig::default()),
+            ProjectKind::Class => Some(conf::ClassConfig::default()),
             _ => None,
         };
-        project::ProjectConfig {
-            project: project::ProjectConfigHead {
+        conf::ProjectConfig {
+            project: conf::ProjectConfigHead {
                 name: self.name.to_string(),
-                system_settings: project::SystemSettings::default(),
-                project_settings: project::ProjectSettings::default(),
+                system_settings: conf::SystemSettings::default(),
+                project_settings: conf::ProjectSettings::default(),
             },
             package,
             class,
-            profiles: project::Profiles::new(),
-            dependencies: project::Dependencies::new(),
+            profiles: conf::Profiles::new(),
+            dependencies: conf::Dependencies::new(),
         }
     }
 
@@ -174,7 +174,7 @@ impl RootDir {
 impl ProjectConfigFile {
     fn try_create<P: typedir::AsPath<Self>>(
         path: &P,
-        project_config: &crate::project::ProjectConfig,
+        project_config: &crate::conf::ProjectConfig,
     ) -> Result<()> {
         try_create(path, ToCreate::File(&toml::ser::to_vec(&project_config)?))
     }

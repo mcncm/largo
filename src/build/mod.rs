@@ -3,9 +3,9 @@ use anyhow::{anyhow, Result};
 use typedir::{Extend, PathBuf as P};
 
 use crate::conf::LargoConfig;
+use crate::conf::{Dependencies, ProfileName, Project, ProjectSettings, SystemSettings};
 use crate::dirs;
 use crate::engines;
-use crate::project::{Dependencies, ProfileName, Project, ProjectSettings, SystemSettings};
 use crate::vars::LargoVars;
 
 impl<'a> crate::vars::LargoVars<'a> {
@@ -44,7 +44,7 @@ pub struct BuildBuilder<'a> {
     project: Project<'a>,
     verbosity: Verbosity,
     /// Which profile to build in
-    profile: Option<crate::project::ProfileName<'a>>,
+    profile: Option<crate::conf::ProfileName<'a>>,
 }
 
 impl<'a> BuildBuilder<'a> {
@@ -57,7 +57,7 @@ impl<'a> BuildBuilder<'a> {
         }
     }
 
-    pub fn with_profile(mut self, name: Option<crate::project::ProfileName<'a>>) -> Self {
+    pub fn with_profile(mut self, name: Option<crate::conf::ProfileName<'a>>) -> Self {
         self.profile = name.as_ref().copied();
         self
     }

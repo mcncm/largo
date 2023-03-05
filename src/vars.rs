@@ -1,6 +1,6 @@
 //! TeX-build-time variables (macros, that is) defined by Largo.
 
-use crate::{dirs, project::ProfileName};
+use crate::{conf::ProfileName, dirs};
 
 use typedir::PathBuf as P;
 
