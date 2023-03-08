@@ -193,7 +193,7 @@ impl ProjectSubcommand {
                         use typedir::Extend;
                         let profile_dir: typedir::PathBuf<dirs::ProfileBuildDir> =
                             build_dir.extend(&profile);
-                        std::fs::remove_dir_all(&profile_dir)?;
+                        std::fs::remove_dir_all(profile_dir)?;
                     }
                     None => {
                         std::fs::remove_dir_all(&build_dir)?;
@@ -224,7 +224,7 @@ impl Subcommand {
         match self {
             Subcommand::Create(subcmd) => subcmd.execute(),
             Subcommand::Project(subcmd) => conf::with_config(|conf, proj| match proj {
-                Some(proj) => subcmd.execute(proj, &conf),
+                Some(proj) => subcmd.execute(proj, conf),
                 None => Err(anyhow::anyhow!("no enclosing project found")),
             })?,
             // This subcommand only exists in debug builds

@@ -94,7 +94,7 @@ impl<'a> BuildBuilder<'a> {
 
     pub fn try_finish(self) -> Result<Build> {
         let build_settings = self.finish()?;
-        build_settings.to_build()
+        build_settings.into_build()
     }
 }
 
@@ -116,7 +116,7 @@ impl<'a> BuildSettings<'a> {
         let tex_format = &self.system_settings.tex_format;
         match (tex_engine, tex_format) {
             (crate::conf::TexEngine::Pdftex, crate::conf::TexFormat::Latex) => {
-                engines::pdflatex::PdflatexBuilder::new(&self.conf)
+                engines::pdflatex::PdflatexBuilder::new(self.conf)
             }
             (_, _) => {
                 unimplemented!();
@@ -131,7 +131,7 @@ impl<'a> BuildSettings<'a> {
             self.root_dir.clone().extend(()).extend(&self.profile_name);
         // FIXME this should happen *at build time*, right?
         std::fs::create_dir_all(&build_dir).expect("TODO: Sorry, this code needs to be refactored; it's a waste of time to handle this error.");
-        let largo_vars = LargoVars::from_build_settings(&self);
+        let largo_vars = LargoVars::from_build_settings(self);
         let eng = self
             .engine_builder()
             .with_src_dir((&mut root_dir).extend(()))
@@ -147,7 +147,7 @@ impl<'a> BuildSettings<'a> {
         Ok(eng)
     }
 
-    fn to_build(self) -> Result<Build> {
+    fn into_build(self) -> Result<Build> {
         let engine = self.get_engine()?;
         Ok(Build {
             verbosity: self.verbosity,
@@ -180,7 +180,7 @@ impl Build {
         } else {
             while let Some(line) = lines.next().await {
                 let line = line?;
-                if line.starts_with("!") {
+                if line.starts_with('!') {
                     println!("{}", line);
                 }
             }

@@ -3,17 +3,17 @@ use anyhow::{anyhow, Result};
 use typedir::{path, pathref, AsPath, Extend, PathBuf as P, PathRef as R};
 
 // Project
-pub const SRC_DIR: &'static str = "src";
-pub const MAIN_FILE: &'static str = "main.tex";
-pub const BUILD_DIR: &'static str = "build";
-pub const PROJECT_CONFIG_FILE: &'static str = "largo.toml";
-pub const LOCK_FILE: &'static str = "largo.lock";
-pub const GITIGNORE: &'static str = ".gitignore";
-pub const GIT_DIR: &'static str = ".git";
+pub const SRC_DIR: &str = "src";
+pub const MAIN_FILE: &str = "main.tex";
+pub const BUILD_DIR: &str = "build";
+pub const PROJECT_CONFIG_FILE: &str = "largo.toml";
+pub const LOCK_FILE: &str = "largo.lock";
+pub const GITIGNORE: &str = ".gitignore";
+pub const GIT_DIR: &str = ".git";
 
 // Largo
-pub const CONFIG_DIR: &'static str = ".largo";
-pub const LARGO_CONFIG_FILE: &'static str = "config.toml";
+pub const CONFIG_DIR: &str = ".largo";
+pub const LARGO_CONFIG_FILE: &str = "config.toml";
 
 /// Strongly-typed file contents
 pub struct ContentString<N: typedir::Node>(String, std::marker::PhantomData<N>);
@@ -192,13 +192,13 @@ fn try_create<N: typedir::Node, P: typedir::AsPath<N>>(
 ) -> Result<()> {
     use std::io::Write;
     match to_create {
-        ToCreate::Dir => std::fs::create_dir(&path)?,
+        ToCreate::Dir => std::fs::create_dir(path)?,
         ToCreate::File(contents) => {
             // FIXME race condition! TOC/TOU! Not good!
             if path.exists() {
                 return Err(anyhow!("file already exists: `{}`", path.display()));
             }
-            let mut f = std::fs::File::create(&path)?;
+            let mut f = std::fs::File::create(path)?;
             f.write_all(contents)?;
         }
     }
@@ -232,14 +232,14 @@ impl LargoConfigDir {
 
 impl LargoConfigFile {
     pub fn try_read<P: AsPath<Self>>(path: &P) -> Result<ContentString<Self>> {
-        let content = std::fs::read_to_string(&path)?;
+        let content = std::fs::read_to_string(path)?;
         Ok(ContentString(content, std::marker::PhantomData))
     }
 }
 
 impl ProjectConfigFile {
     pub fn try_read<P: AsPath<Self>>(path: &P) -> Result<ContentString<Self>> {
-        let content = std::fs::read_to_string(&path)?;
+        let content = std::fs::read_to_string(path)?;
         Ok(ContentString(content, std::marker::PhantomData))
     }
 }

@@ -22,7 +22,7 @@ pub struct PackageName<'a>(&'a str);
 
 impl<'a> AsRef<str> for PackageName<'a> {
     fn as_ref(&self) -> &str {
-        &self.0
+        self.0
     }
 }
 

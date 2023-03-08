@@ -26,9 +26,11 @@ impl PdflatexBuilder {
     // should have access to.
     pub fn new(conf: &crate::conf::LargoConfig) -> Self {
         let cmd = crate::Command::new(&conf.executables.pdflatex);
-        let mut cli_options = CommandLineOptions::default();
-        // Always use nonstop mode for now.
-        cli_options.interaction = Some(InteractionMode::NonStopMode);
+        let cli_options = CommandLineOptions {
+            // Always use nonstop mode for now.
+            interaction: Some(InteractionMode::NonStopMode),
+            ..Default::default()
+        };
         Self {
             cmd,
             cli_options,
@@ -127,7 +129,7 @@ impl clam::ArgValue for InteractionMode {
             InteractionMode::ScrollMode => "scrollmode",
             InteractionMode::ErrorStopMode => "errorstopmode",
         };
-        cmd.args([name, &mode]);
+        cmd.args([name, mode]);
     }
 }
 
@@ -146,7 +148,7 @@ impl clam::ArgValue for MkTexFormat {
             MkTexFormat::Tfm => "tfm",
             MkTexFormat::Pk => "pk",
         };
-        cmd.args([name, &format]);
+        cmd.args([name, format]);
     }
 }
 
@@ -173,7 +175,7 @@ impl clam::ArgValue for SrcSpecial {
             SrcSpecial::Parend => "parend",
             SrcSpecial::Vbox => "vbox",
         };
-        cmd.args([name, &special]);
+        cmd.args([name, special]);
     }
 }
 
@@ -190,7 +192,7 @@ impl clam::ArgValue for Format {
             Format::Pdf => "pdf",
             Format::Dvi => "dvi",
         };
-        cmd.args([name, &format]);
+        cmd.args([name, format]);
     }
 }
 

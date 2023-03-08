@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 use crate::dirs::{self, ContentString as S};
 use crate::Result;
 
-pub const DEBUG_PROFILE: &'static str = "debug";
-pub const RELEASE_PROFILE: &'static str = "release";
+pub const DEBUG_PROFILE: &str = "debug";
+pub const RELEASE_PROFILE: &str = "release";
 
 // FIXME: these shouldn't know about `clap`.
 /// The document preparation systems that can be used by a package.
@@ -50,13 +50,13 @@ pub struct Executable<'c>(&'c str);
 
 impl<'c> AsRef<str> for Executable<'c> {
     fn as_ref(&self) -> &str {
-        &self.0
+        self.0
     }
 }
 
 impl<'c> AsRef<std::ffi::OsStr> for Executable<'c> {
     fn as_ref(&self) -> &std::ffi::OsStr {
-        &self.0.as_ref()
+        self.0.as_ref()
     }
 }
 
@@ -275,7 +275,7 @@ pub struct DependencyName<'c>(&'c str);
 
 impl<'c> AsRef<str> for DependencyName<'c> {
     fn as_ref(&self) -> &str {
-        &self.0
+        self.0
     }
 }
 
@@ -308,7 +308,7 @@ impl<'a> IntoIterator for &'a Dependencies<'a> {
     type IntoIter = <&'a BTreeMap<DependencyName<'a>, Dependency<'a>> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        (&self.0).into_iter()
+        (self.0).iter()
     }
 }
 

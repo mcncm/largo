@@ -2,5 +2,5 @@
 
 pub mod packages;
 
-pub const GITIGNORE: &'static [u8] = include_bytes!("gitignore.txt");
-pub const MAIN_LATEX: &'static [u8] = include_bytes!("main_latex.tex");
+pub const GITIGNORE: &[u8] = include_bytes!("gitignore.txt");
+pub const MAIN_LATEX: &[u8] = include_bytes!("main_latex.tex");
