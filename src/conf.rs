@@ -87,17 +87,58 @@ executable_config![tex, latex, pdftex, pdflatex, xetex, xelatex, luatex, lualate
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "kebab-case")]
+pub struct BuildConfig<'c> {
+    #[serde(flatten, borrow)]
+    pub execs: ExecutableConfig<'c>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct BibConfig<'c> {
+    #[serde(borrow)]
+    pub bibliography: Option<&'c str>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TermColor {
+    Bool(bool),
+    #[default]
+    Auto,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct TermConfig {
+    quiet: bool,
+    verbose: bool,
+    color: TermColor,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct DocConfig<'c> {
+    reader: Option<&'c str>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct LargoConfig<'c> {
     #[serde(flatten, borrow)]
-    pub executables: ExecutableConfig<'c>,
+    pub build: BuildConfig<'c>,
     /// The default profile selected if no other profile is chosen.
+    #[serde(borrow)]
     pub default_profile: ProfileName<'c>,
     /// The default TeX format
     pub default_tex_format: TexFormat,
     /// The default TeX engine
     pub default_tex_engine: TexEngine,
     /// Global bibliography file
-    pub default_bibliography: Option<&'c str>,
+    #[serde(borrow)]
+    pub bib: BibConfig<'c>,
+    #[serde(borrow)]
+    pub doc: DocConfig<'c>,
+    pub term: TermConfig,
 }
 
 impl<'c> LargoConfig<'c> {
@@ -107,15 +148,16 @@ impl<'c> LargoConfig<'c> {
     }
 
     pub fn choose_program(&self, engine: TexEngine, format: TexFormat) -> &Executable<'c> {
+        let execs = &self.build.execs;
         match (engine, format) {
-            (TexEngine::Tex, TexFormat::Tex) => &self.executables.tex,
-            (TexEngine::Tex, TexFormat::Latex) => &self.executables.latex,
-            (TexEngine::Pdftex, TexFormat::Tex) => &self.executables.pdftex,
-            (TexEngine::Pdftex, TexFormat::Latex) => &self.executables.pdflatex,
-            (TexEngine::Xetex, TexFormat::Tex) => &self.executables.xetex,
-            (TexEngine::Xetex, TexFormat::Latex) => &self.executables.xelatex,
-            (TexEngine::Luatex, TexFormat::Tex) => &self.executables.luatex,
-            (TexEngine::Luatex, TexFormat::Latex) => &self.executables.lualatex,
+            (TexEngine::Tex, TexFormat::Tex) => &execs.tex,
+            (TexEngine::Tex, TexFormat::Latex) => &execs.latex,
+            (TexEngine::Pdftex, TexFormat::Tex) => &execs.pdftex,
+            (TexEngine::Pdftex, TexFormat::Latex) => &execs.pdflatex,
+            (TexEngine::Xetex, TexFormat::Tex) => &execs.xetex,
+            (TexEngine::Xetex, TexFormat::Latex) => &execs.xelatex,
+            (TexEngine::Luatex, TexFormat::Tex) => &execs.luatex,
+            (TexEngine::Luatex, TexFormat::Latex) => &execs.lualatex,
         }
     }
 }

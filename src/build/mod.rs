@@ -14,7 +14,7 @@ impl<'a> crate::vars::LargoVars<'a> {
         let root_dir = settings.root_dir.clone();
         Self {
             profile: settings.profile_name,
-            bibliography: settings.conf.default_bibliography,
+            bibliography: settings.conf.bib.bibliography,
             output_directory: root_dir.extend(()).extend(&settings.profile_name),
         }
     }
@@ -94,7 +94,7 @@ impl<'a> BuildBuilder<'a> {
 
     pub fn try_finish(self) -> Result<Build> {
         let build_settings = self.finish()?;
-        build_settings.into_build()
+        build_settings.to_build()
     }
 }
 
@@ -147,7 +147,7 @@ impl<'a> BuildSettings<'a> {
         Ok(eng)
     }
 
-    fn into_build(self) -> Result<Build> {
+    fn to_build(self) -> Result<Build> {
         let engine = self.get_engine()?;
         Ok(Build {
             verbosity: self.verbosity,

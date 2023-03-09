@@ -25,7 +25,7 @@ impl PdflatexBuilder {
     // should probably be using some _other_ input; that's more data than it
     // should have access to.
     pub fn new(conf: &crate::conf::LargoConfig) -> Self {
-        let cmd = crate::Command::new(&conf.executables.pdflatex);
+        let cmd = crate::Command::new(&conf.build.execs.pdflatex);
         let cli_options = CommandLineOptions {
             // Always use nonstop mode for now.
             interaction: Some(InteractionMode::NonStopMode),
