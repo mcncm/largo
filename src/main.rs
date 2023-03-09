@@ -1,10 +1,8 @@
 use largo::cli::Cli;
-use largo::Result;
+use largo_core::Result;
 
 use clap::Parser;
 
 fn main() -> Result<()> {
-    let cli = Cli::parse();
-    let res = cli.execute();
-    res
+    Cli::parse().execute()
 }

@@ -1,6 +1,6 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 
-use crate::{build, conf, dirs, Result};
+use largo_core::{build, conf, dirs, Result};
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -52,6 +52,20 @@ enum ProjectSubcommand {
     DebugBuild(BuildSubcommand),
 }
 
+#[derive(Debug, Clone, ValueEnum)]
+enum TexFormat {
+    Tex,
+    Latex,
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum TexEngine {
+    Tex,
+    Pdftex,
+    Xetex,
+    Luatex,
+}
+
 #[derive(Debug, Parser)]
 #[clap(group(
     clap::ArgGroup::new("type")
@@ -82,10 +96,10 @@ struct InitSubcommand {
     _beamer: bool,
     #[arg(long, value_enum)]
     /// Overrides the default TeX format if set
-    system: Option<conf::TexFormat>,
+    system: Option<TexFormat>,
     #[arg(long, value_enum)]
     /// Overrides the default TeX engine if set
-    engine: Option<conf::TexEngine>,
+    engine: Option<TexEngine>,
 }
 
 #[derive(Debug, Parser)]
@@ -189,7 +203,7 @@ impl ProjectSubcommand {
                 let build_dir = typedir::path!(root => dirs::BuildDir);
                 match &profile {
                     Some(profile) => {
-                        let profile: crate::conf::ProfileName = profile.as_str().try_into()?;
+                        let profile: largo_core::conf::ProfileName = profile.as_str().try_into()?;
                         use typedir::Extend;
                         let profile_dir: typedir::PathBuf<dirs::ProfileBuildDir> =
                             build_dir.extend(&profile);

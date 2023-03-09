@@ -11,7 +11,7 @@ pub const RELEASE_PROFILE: &str = "release";
 
 // FIXME: these shouldn't know about `clap`.
 /// The document preparation systems that can be used by a package.
-#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, clap::ValueEnum)]
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TexFormat {
     Tex,
@@ -20,7 +20,7 @@ pub enum TexFormat {
 }
 
 /// The document preparation systems that can be used by a package.
-#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, clap::ValueEnum)]
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TexEngine {
     Tex,
@@ -39,7 +39,7 @@ pub enum OutputFormat {
     Pdf,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, clap::ValueEnum)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum BibEngine {
     Biber,

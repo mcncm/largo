@@ -544,9 +544,19 @@ name = "largo"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap",
+ "largo_core",
+ "smol",
+ "typedir",
+]
+
+[[package]]
+name = "largo_core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
  "chrono",
  "clam",
- "clap",
  "itertools",
  "serde",
  "smol",
