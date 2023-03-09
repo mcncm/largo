@@ -8,7 +8,7 @@ use merge::Merge;
 use crate::dirs::{self, ContentString as S};
 use crate::Result;
 
-pub const DEBUG_PROFILE: &str = "debug";
+pub const DEV_PROFILE: &str = "dev";
 pub const RELEASE_PROFILE: &str = "release";
 
 // FIXME: these shouldn't know about `clap`.
@@ -244,7 +244,7 @@ pub struct ProfileName<'c>(&'c str);
 
 impl<'c> Default for ProfileName<'c> {
     fn default() -> Self {
-        Self(crate::conf::DEBUG_PROFILE)
+        Self(crate::conf::DEV_PROFILE)
     }
 }
 
@@ -288,7 +288,7 @@ impl Profiles<'static> {
         let mut profiles = Profiles::new();
         let dev_profile = Profile::default();
         let release_profile = Profile::default();
-        profiles.0.insert(ProfileName(DEBUG_PROFILE), dev_profile);
+        profiles.0.insert(ProfileName(DEV_PROFILE), dev_profile);
         profiles
             .0
             .insert(ProfileName(RELEASE_PROFILE), release_profile);
