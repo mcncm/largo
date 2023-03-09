@@ -1,3 +1,5 @@
+pub use clam_macro::Options;
+
 pub trait Command {
     fn arg<S: AsRef<std::ffi::OsStr>>(&mut self, arg: S) -> &mut Self;
 
@@ -35,8 +37,6 @@ impl Command for async_process::Command {
         self.args(args)
     }
 }
-
-pub use clam_macro::Options;
 
 pub trait Options {
     fn apply<C: Command>(self, cmd: &mut C);
