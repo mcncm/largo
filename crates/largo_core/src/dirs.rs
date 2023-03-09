@@ -205,6 +205,19 @@ fn try_create<N: typedir::Node, P: typedir::AsPath<N>>(
     Ok(())
 }
 
+/// A thin wrapper around `std::fs::remove_dir_all` that ignores `NotFound` errors.
+pub fn remove_dir_all<N: typedir::Node, P: typedir::AsPath<N>>(dir: &P) -> crate::Result<()> {
+    let res = std::fs::remove_dir_all(dir);
+    if let Err(err) = res {
+        match err.kind() {
+            std::io::ErrorKind::NotFound => Ok(()),
+            _ => Err(err.into()),
+        }
+    } else {
+        Ok(())
+    }
+}
+
 impl HomeDir {
     /// NOTE: Intentionally not globally visible!
     fn try_get() -> Result<P<Self>> {

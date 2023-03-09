@@ -207,13 +207,10 @@ impl ProjectSubcommand {
                         use typedir::Extend;
                         let profile_dir: typedir::PathBuf<dirs::ProfileBuildDir> =
                             build_dir.extend(&profile);
-                        std::fs::remove_dir_all(profile_dir)?;
+                        dirs::remove_dir_all(&profile_dir)
                     }
-                    None => {
-                        std::fs::remove_dir_all(&build_dir)?;
-                    }
+                    None => dirs::remove_dir_all(&build_dir),
                 }
-                Ok(())
             }
             Eject => todo!(),
             // This subcommand only exists in debug builds
