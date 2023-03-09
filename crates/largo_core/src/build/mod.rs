@@ -75,7 +75,8 @@ impl<'a> BuildBuilder<'a> {
         let root_dir = project.root;
         let profile_name = self.profile.unwrap_or(self.conf.default_profile);
         // FIXME This is a bug: there should *always* be a default profile to select
-        let profiles = project.config.profiles;
+        let mut profiles = project.config.profiles.unwrap_or_default();
+        profiles.merge_left(crate::conf::Profiles::standard());
         let profile = profiles
             .select_profile(&profile_name)
             .ok_or_else(|| anyhow!("profile `{}` not found", profile_name))?;

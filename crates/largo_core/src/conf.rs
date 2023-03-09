@@ -213,7 +213,7 @@ pub struct ProjectConfig<'c> {
     pub package: Option<PackageConfig>,
     pub class: Option<ClassConfig>,
     #[serde(rename = "profile", default, borrow)]
-    pub profiles: Profiles<'c>,
+    pub profiles: Option<Profiles<'c>>,
     #[serde(default)]
     pub dependencies: Dependencies<'c>,
 }
@@ -268,7 +268,7 @@ impl<'c> TryFrom<&'c str> for ProfileName<'c> {
     }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Merge)]
 pub struct Profiles<'c>(#[serde(borrow)] BTreeMap<ProfileName<'c>, Profile>);
 
 impl<'c> Profiles<'c> {
@@ -281,7 +281,22 @@ impl<'c> Profiles<'c> {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+impl Profiles<'static> {
+    /// The standard profiles that are always available and initially configured
+    /// with some default settings
+    pub fn standard() -> Self {
+        let mut profiles = Profiles::new();
+        let dev_profile = Profile::default();
+        let release_profile = Profile::default();
+        profiles.0.insert(ProfileName(DEBUG_PROFILE), dev_profile);
+        profiles
+            .0
+            .insert(ProfileName(RELEASE_PROFILE), release_profile);
+        profiles
+    }
+}
+
+#[derive(Debug, Default, Deserialize, Serialize, Merge)]
 #[serde(rename_all = "kebab-case")]
 pub struct Profile {
     #[serde(flatten)]

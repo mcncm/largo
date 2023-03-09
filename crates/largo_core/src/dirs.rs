@@ -84,7 +84,7 @@ impl<'a> NewProject<'a> {
             },
             package,
             class,
-            profiles: conf::Profiles::new(),
+            profiles: None,
             dependencies: conf::Dependencies::new(),
         }
     }
