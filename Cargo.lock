@@ -558,6 +558,7 @@ dependencies = [
  "chrono",
  "clam",
  "itertools",
+ "merge",
  "serde",
  "smol",
  "thiserror",

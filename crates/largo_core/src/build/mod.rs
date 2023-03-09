@@ -69,6 +69,7 @@ impl<'a> BuildBuilder<'a> {
 
     /// Unpack the data we've been passed into a more convenient shape
     fn finish(self) -> Result<BuildSettings<'a>> {
+        use merge::Merge;
         let conf = self.conf;
         let project = self.project;
         let root_dir = project.root;
@@ -79,7 +80,8 @@ impl<'a> BuildBuilder<'a> {
             .select_profile(&profile_name)
             .ok_or_else(|| anyhow!("profile `{}` not found", profile_name))?;
         let proj_conf = project.config.project;
-        let project_settings = proj_conf.project_settings.merge(profile.project_settings);
+        let mut project_settings = proj_conf.project_settings;
+        project_settings.merge_right(profile.project_settings);
         let dependencies = project.config.dependencies;
         Ok(BuildSettings {
             conf,
@@ -138,7 +140,7 @@ impl<'a> BuildSettings<'a> {
             .with_output_dir(build_dir)
             .with_verbosity(&self.verbosity)
             .with_largo_vars(&largo_vars)?
-            .with_synctex(self.project_settings.synctex)?
+            .with_synctex(self.project_settings.synctex.unwrap_or_default())?
             .with_shell_escape(self.project_settings.shell_escape)?
             .with_dependencies(&crate::dependencies::get_dependency_paths(
                 &self.dependencies,

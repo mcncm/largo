@@ -27,77 +27,121 @@ fn derive_command_inner(input: DeriveInput) -> Result<proc_macro2::TokenStream> 
 #[derive(darling::FromDeriveInput, Debug, Clone)]
 #[darling(attributes(merge))]
 struct MergeData {
-    pub ident: syn::Ident,
+    ident: syn::Ident,
     #[allow(unused)]
-    pub generics: darling::ast::Generics<()>,
-    pub data: darling::ast::Data<darling::util::Ignored, MergeField>,
+    generics: syn::Generics,
+    data: darling::ast::Data<darling::util::Ignored, MergeField>,
+    #[darling(default)]
+    replace: bool,
 }
 
 #[derive(darling::FromField, Debug, Clone)]
 #[darling(attributes(option))]
 struct MergeField {
-    pub ident: Option<syn::Ident>,
-    pub skip: Option<()>,
+    ident: Option<syn::Ident>,
+    skip: Option<()>,
 }
 
 impl MergeData {
     fn emit(self) -> Result<proc_macro2::TokenStream> {
         let MergeData {
             ident,
-            generics: _,
+            generics:
+                syn::Generics {
+                    params,
+                    where_clause,
+                    ..
+                },
             data,
+            replace,
         } = self;
-        let fields = match data {
-            darling::ast::Data::Struct(fields) => fields,
-            darling::ast::Data::Enum(_) => {
-                return Err(Error::new(
-                    // I know this is the wrong span, but `darling` doesn't save the
-                    // one for the `enum` keyword
-                    ident.span(),
-                    anyhow::anyhow!("can only derive `Merge` for a struct"),
-                ));
-            }
-        };
-
-        let field_merges_left =
-            fields
-                .clone()
-                .into_iter()
-                .filter_map(|field: MergeField| match field.skip {
-                    Some(_) => None,
-                    None => {
-                        let field_ident = field.ident;
-                        Some(quote! {
-                            self.#field_ident.merge_left(other.#field_ident);
-                        })
-                    }
-                });
-
-        let field_merges_right =
-            fields
-                .into_iter()
-                .filter_map(|field: MergeField| match field.skip {
-                    Some(_) => None,
-                    None => {
-                        let field_ident = field.ident;
-                        Some(quote! {
-                            self.#field_ident.merge_right(other.#field_ident);
-                        })
-                    }
-                });
-
-        Ok(quote! {
-            impl merge::Merge for #ident {
+        let impls = if replace {
+            quote! {
                 fn merge_left(&mut self, other: Self) -> &mut Self {
-                    #(#field_merges_left)*
                     self
                 }
 
                 fn merge_right(&mut self, other: Self) -> &mut Self {
-                    #(#field_merges_right)*
+                    *self = other;
                     self
                 }
             }
+        } else {
+            let fields = match data {
+                darling::ast::Data::Struct(fields) => fields,
+                darling::ast::Data::Enum(_) => {
+                    return Err(Error::new(
+                        // I know this is the wrong span, but `darling` doesn't save the
+                        // one for the `enum` keyword
+                        ident.span(),
+                        anyhow::anyhow!(
+                            "must use `#[merge(replace)]` to derive `Merge` for an enum"
+                        ),
+                    ));
+                }
+            };
+
+            emit_impls_rec(fields)
+        };
+        Ok(quote! {
+            impl<#params> merge::Merge for #ident<#params> #where_clause {
+                #impls
+            }
         })
+    }
+}
+
+fn emit_impls_rec(fields: darling::ast::Fields<MergeField>) -> proc_macro2::TokenStream {
+    let field_merges_left =
+        fields
+            .clone()
+            .into_iter()
+            .enumerate()
+            .filter_map(|(idx, field): (usize, MergeField)| {
+                let idx = syn::Index::from(idx);
+                match (field.skip, field.ident) {
+                    // This field is skipped
+                    (Some(_), _) => None,
+                    // This is a tuple field
+                    (_, None) => Some(quote! {
+                            merge::Merge::merge_left(&mut self.#idx, other.#idx);
+                    }),
+                    // This is a named field
+                    (_, Some(ident)) => Some(quote! {
+                            merge::Merge::merge_left(&mut self.#ident, other.#ident);
+                    }),
+                }
+            });
+
+    let field_merges_right =
+        fields
+            .into_iter()
+            .enumerate()
+            .filter_map(|(idx, field): (usize, MergeField)| {
+                let idx = syn::Index::from(idx);
+                match (field.skip, field.ident) {
+                    // This field is skipped
+                    (Some(_), _) => None,
+                    // This is a tuple field
+                    (_, None) => Some(quote! {
+                            merge::Merge::merge_right(&mut self.#idx, other.#idx);
+                    }),
+                    // This is a named field
+                    (_, Some(ident)) => Some(quote! {
+                            merge::Merge::merge_right(&mut self.#ident, other.#ident);
+                    }),
+                }
+            });
+
+    quote! {
+        fn merge_left(&mut self, other: Self) -> &mut Self {
+            #(#field_merges_left)*
+            self
+        }
+
+        fn merge_right(&mut self, other: Self) -> &mut Self {
+            #(#field_merges_right)*
+            self
+        }
     }
 }

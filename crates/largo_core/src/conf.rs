@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+use merge::Merge;
+
 use crate::dirs::{self, ContentString as S};
 use crate::Result;
 
@@ -11,7 +13,8 @@ pub const RELEASE_PROFILE: &str = "release";
 
 // FIXME: these shouldn't know about `clap`.
 /// The document preparation systems that can be used by a package.
-#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, Merge)]
+#[merge(replace)]
 #[serde(rename_all = "lowercase")]
 pub enum TexFormat {
     Tex,
@@ -20,7 +23,8 @@ pub enum TexFormat {
 }
 
 /// The document preparation systems that can be used by a package.
-#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, Merge)]
+#[merge(replace)]
 #[serde(rename_all = "lowercase")]
 pub enum TexEngine {
     Tex,
@@ -30,7 +34,8 @@ pub enum TexEngine {
     Luatex,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Merge)]
+#[merge(replace)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputFormat {
     Dvi,
@@ -39,13 +44,14 @@ pub enum OutputFormat {
     Pdf,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Merge)]
+#[merge(replace)]
 #[serde(rename_all = "lowercase")]
 pub enum BibEngine {
     Biber,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Merge)]
 pub struct Executable<'c>(&'c str);
 
 impl<'c> AsRef<str> for Executable<'c> {
@@ -62,7 +68,7 @@ impl<'c> AsRef<std::ffi::OsStr> for Executable<'c> {
 
 macro_rules! executable_config {
     ($($exec:ident),*) => {
-        #[derive(Debug, Serialize, Deserialize)]
+        #[derive(Debug, Serialize, Deserialize, Merge)]
         #[serde(default)]
         pub struct ExecutableConfig<'c> {
             $(
@@ -85,21 +91,22 @@ macro_rules! executable_config {
 
 executable_config![tex, latex, pdftex, pdflatex, xetex, xelatex, luatex, lualatex, biber];
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Merge)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct BuildConfig<'c> {
     #[serde(flatten, borrow)]
     pub execs: ExecutableConfig<'c>,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Merge)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct BibConfig<'c> {
     #[serde(borrow)]
     pub bibliography: Option<&'c str>,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Merge)]
+#[merge(replace)]
 #[serde(rename_all = "kebab-case")]
 pub enum TermColor {
     Bool(bool),
@@ -107,7 +114,8 @@ pub enum TermColor {
     Auto,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Merge)]
+#[merge(replace)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct TermConfig {
     quiet: bool,
@@ -115,13 +123,13 @@ pub struct TermConfig {
     color: TermColor,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Merge)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct DocConfig<'c> {
     reader: Option<&'c str>,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Merge)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct LargoConfig<'c> {
     #[serde(flatten, borrow)]
@@ -228,7 +236,9 @@ pub struct PackageConfig {}
 #[serde(rename_all = "kebab-case")]
 pub struct ClassConfig {}
 
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[derive(
+    Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize, Merge,
+)]
 #[serde(transparent)]
 pub struct ProfileName<'c>(&'c str);
 
@@ -286,7 +296,7 @@ pub struct SystemSettings {
     pub bib_engine: Option<BibEngine>,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Merge)]
 #[serde(rename_all = "kebab-case")]
 pub struct ProjectSettings {
     pub output_format: Option<OutputFormat>,
@@ -295,20 +305,7 @@ pub struct ProjectSettings {
     pub shell_escape: Option<bool>,
     /// whether to use SyncTeX to synchronize between TeX source and the
     /// compiled document
-    #[serde(default)]
-    pub synctex: bool,
-}
-
-impl ProjectSettings {
-    pub fn merge(self, other: Self) -> Self {
-        Self {
-            output_format: self.output_format.or(other.output_format),
-            shell_escape: self.shell_escape.or(other.shell_escape),
-            // TODO: think: is this really how we want to merge these? Isn't this
-            // too infectious?
-            synctex: self.synctex || other.synctex,
-        }
-    }
+    pub synctex: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize)]
