@@ -39,7 +39,7 @@ pub trait EngineBuilder: private::CommandBuilder + Sized {
         self
     }
 
-    fn with_output_dir<P: typedir::AsPath<dirs::ProfileBuildDir>>(self, path: P) -> Self;
+    fn with_output_dir<P: typedir::AsPath<dirs::ProfileTargetDir>>(self, path: P) -> Self;
 
     fn with_verbosity(self, verbosity: &build::Verbosity) -> Self;
 

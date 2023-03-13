@@ -52,7 +52,7 @@ impl PdflatexBuilder {
 }
 
 impl EngineBuilder for PdflatexBuilder {
-    fn with_output_dir<P: typedir::AsPath<dirs::ProfileBuildDir>>(mut self, path: P) -> Self {
+    fn with_output_dir<P: typedir::AsPath<dirs::ProfileTargetDir>>(mut self, path: P) -> Self {
         self.cli_options.output_directory = Some(path.to_path_buf());
         self
     }

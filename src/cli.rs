@@ -200,12 +200,12 @@ impl ProjectSubcommand {
             // directory if `proj` is constructed.
             Clean { profile } => {
                 let root = project.root;
-                let build_dir = typedir::path!(root => dirs::BuildDir);
+                let build_dir = typedir::path!(root => dirs::TargetDir);
                 match &profile {
                     Some(profile) => {
                         let profile: largo_core::conf::ProfileName = profile.as_str().try_into()?;
                         use typedir::Extend;
-                        let profile_dir: typedir::PathBuf<dirs::ProfileBuildDir> =
+                        let profile_dir: typedir::PathBuf<dirs::ProfileTargetDir> =
                             build_dir.extend(&profile);
                         dirs::remove_dir_all(&profile_dir)
                     }

@@ -5,7 +5,9 @@ use typedir::{path, pathref, AsPath, Extend, PathBuf as P, PathRef as R};
 // Project
 pub const SRC_DIR: &str = "src";
 pub const MAIN_FILE: &str = "main.tex";
+pub const TARGET_DIR: &str = "target";
 pub const BUILD_DIR: &str = "build";
+pub const DEPS_DIR: &str = "deps";
 pub const PROJECT_CONFIG_FILE: &str = "largo.toml";
 pub const LOCK_FILE: &str = "largo.lock";
 pub const GITIGNORE: &str = ".gitignore";
@@ -39,8 +41,11 @@ typedir::typedir! {
         SRC_DIR => node SrcDir {
             forall s: &str, s => node SrcFile;
         };
-        BUILD_DIR => node BuildDir {
-            forall s: &crate::conf::ProfileName<'_>, s.as_ref() => node ProfileBuildDir;
+        TARGET_DIR => node TargetDir {
+            forall s: &crate::conf::ProfileName<'_>, s.as_ref() => node ProfileTargetDir {
+                DEPS_DIR => node DepsDir;
+                BUILD_DIR => node BuildDir;
+            };
         };
         GIT_DIR => node GitDir;
         GITIGNORE => node Gitignore;
@@ -143,7 +148,7 @@ impl<'a> NewProject<'a> {
             self.try_create_src_file(&mut src_dir)?;
         }
         // Build directory
-        let build_dir = path!(root => BuildDir);
+        let build_dir = path!(root => TargetDir);
         try_create(&build_dir, ToCreate::Dir)?;
         Ok(())
     }

@@ -130,7 +130,7 @@ impl<'a> BuildSettings<'a> {
     fn get_engine(&self) -> Result<engines::Engine> {
         use engines::EngineBuilder;
         let mut root_dir = self.root_dir.clone();
-        let build_dir: P<dirs::ProfileBuildDir> =
+        let build_dir: P<dirs::ProfileTargetDir> =
             self.root_dir.clone().extend(()).extend(&self.profile_name);
         // FIXME this should happen *at build time*, right?
         std::fs::create_dir_all(&build_dir).expect("TODO: Sorry, this code needs to be refactored; it's a waste of time to handle this error.");
