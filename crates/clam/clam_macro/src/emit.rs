@@ -5,19 +5,12 @@ use crate::{Error, Result};
 
 /// Convert from snake case to kebab_case with one dash
 fn to_one_dash_kebab_case(old: &str) -> String {
-    std::iter::once('-')
-        .chain(old.chars())
-        .map(|c| if c == '_' { '-' } else { c })
-        .collect()
+    format!("-{}", heck::AsKebabCase(old))
 }
 
 /// Convert from snake case to kebab_case with two dashes
 fn to_two_dash_kebab_case(old: &str) -> String {
-    std::iter::once('-')
-        .chain(std::iter::once('-'))
-        .chain(old.chars())
-        .map(|c| if c == '_' { '-' } else { c })
-        .collect()
+    format!("--{}", heck::AsKebabCase(old))
 }
 
 struct LoweringCtx {
