@@ -166,11 +166,11 @@ impl CreateSubcommand {
 }
 
 impl BuildSubcommand {
-    fn try_to_build(
-        &self,
-        project: conf::Project,
-        conf: &conf::LargoConfig,
-    ) -> Result<build::Build> {
+    fn try_to_build<'c>(
+        &'c self,
+        project: conf::Project<'c>,
+        conf: &'c conf::LargoConfig,
+    ) -> Result<build::BuildRunner<'c>> {
         let profile = match &self.profile {
             Some(p) => Some(p.as_str().try_into()?),
             None => None,
@@ -187,13 +187,53 @@ impl BuildSubcommand {
     }
 }
 
+struct Info<'c>(largo_core::build::BuildInfo<'c>);
+
+impl<'c> Info<'c> {
+    fn info_name(&self) -> &str {
+        use build::BuildInfo::*;
+        match &self.0 {
+            Compiling { .. } => "Compiling",
+            Running { .. } => "Running",
+            Finished { .. } => "Finished",
+        }
+    }
+}
+
+impl<'c> std::fmt::Display for Info<'c> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use build::BuildInfo::*;
+        let info = &self.0;
+        write!(f, "{: >12} ", self.info_name())?;
+        match info {
+            Compiling {
+                project,
+                version: _,
+                root,
+            } => write!(f, "{} ({})", project, root.display()),
+            Running { exec } => write!(f, "{}", <largo_core::conf::Executable<'_> as AsRef<str>>::as_ref(exec)),
+            Finished {
+                profile_name,
+                duration,
+            } => write!(f, "`{}` in {:.2}s", profile_name, duration.as_secs_f32()),
+        }
+    }
+}
+
 impl ProjectSubcommand {
     fn execute(&self, project: conf::Project, conf: &conf::LargoConfig) -> Result<()> {
         use ProjectSubcommand::*;
         match self {
             Build(subcmd) => {
                 // Run this inside an async runtime
-                smol::block_on(async { subcmd.try_to_build(project, conf)?.run().await })
+                smol::block_on(async {
+                    use smol::stream::StreamExt;
+                    let mut build_info = subcmd.try_to_build(project, conf)?.run().await;
+                    while let Some(info) = build_info.next().await {
+                        println!("{}", Info(info));
+                    }
+                    Ok::<(), largo_core::Error>(())
+                })
             }
             // the `Project` is (reasonable) proof that it is a valid project:
             // the manifest file parses. It's *reasonably* safe to delete a
