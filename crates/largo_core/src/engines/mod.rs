@@ -1,4 +1,4 @@
-use crate::{build, dirs};
+use crate::{build, dirs, Result};
 
 use smol::{io::BufReader, process::ChildStdout};
 
@@ -13,8 +13,48 @@ pub struct Engine {
     cmd: crate::Command,
 }
 
+#[derive(Debug)]
+pub enum EngineInfo {
+    Error { line: usize, msg: String },
+}
+
+#[derive(Debug)]
+pub struct EngineOutput {
+    lines: smol::io::Lines<BufReader<ChildStdout>>,
+}
+
+impl smol::stream::Stream for EngineOutput {
+    type Item = EngineInfo;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        use smol::stream::StreamExt;
+        use std::task::Poll;
+        match self.lines.poll_next(cx) {
+            Poll::Ready(Some(_line)) => {
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => {
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        }
+    }
+}
+
 impl Engine {
-    pub fn run(&mut self) -> crate::Result<BufReader<ChildStdout>> {
+    pub fn run(&mut self) -> Result<EngineOutput> {
+        use smol::prelude::*;
+        let stdout = self.run_inner()?;
+        let lines = stdout.lines();
+        Ok(EngineOutput { lines })
+    }
+
+    fn run_inner(&mut self) -> crate::Result<BufReader<ChildStdout>> {
         // `async_process::Child` does not require a manual call to `.wait()`.
         let mut child = self.cmd.spawn()?;
         let stdout = child.stdout.take().expect("failed to take child's stdout");

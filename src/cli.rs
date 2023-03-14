@@ -187,11 +187,23 @@ impl BuildSubcommand {
     }
 }
 
-struct Info<'c>(largo_core::build::BuildInfo<'c>);
+// Wrapper structs for info from core
+struct BuildInfo<'c>(largo_core::build::BuildInfo<'c>);
+struct LargoInfo<'c>(&'c largo_core::build::LargoInfo<'c>);
+struct EngineInfo<'c>(&'c largo_core::engines::EngineInfo);
 
-impl<'c> Info<'c> {
+impl<'c> std::fmt::Display for BuildInfo<'c> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.0 {
+            build::BuildInfo::LargoInfo(info) => LargoInfo(info).fmt(f),
+            build::BuildInfo::EngineInfo(info) => EngineInfo(info).fmt(f),
+        }
+    }
+}
+
+impl<'c> LargoInfo<'c> {
     fn info_name(&self) -> &str {
-        use build::BuildInfo::*;
+        use build::LargoInfo::*;
         match &self.0 {
             Compiling { .. } => "Compiling",
             Running { .. } => "Running",
@@ -200,9 +212,9 @@ impl<'c> Info<'c> {
     }
 }
 
-impl<'c> std::fmt::Display for Info<'c> {
+impl<'c> std::fmt::Display for LargoInfo<'c> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use build::BuildInfo::*;
+        use build::LargoInfo::*;
         let info = &self.0;
         write!(f, "{: >12} ", self.info_name())?;
         match info {
@@ -211,11 +223,24 @@ impl<'c> std::fmt::Display for Info<'c> {
                 version: _,
                 root,
             } => write!(f, "{} ({})", project, root.display()),
-            Running { exec } => write!(f, "{}", <largo_core::conf::Executable<'_> as AsRef<str>>::as_ref(exec)),
+            Running { exec } => write!(
+                f,
+                "{}",
+                <largo_core::conf::Executable<'_> as AsRef<str>>::as_ref(exec)
+            ),
             Finished {
                 profile_name,
                 duration,
             } => write!(f, "`{}` in {:.2}s", profile_name, duration.as_secs_f32()),
+        }
+    }
+}
+
+impl<'c> std::fmt::Display for EngineInfo<'c> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use largo_core::engines::EngineInfo;
+        match &self.0 {
+            EngineInfo::Error { line, msg } => write!(f, "error [{}]: {}", line, msg),
         }
     }
 }
@@ -228,9 +253,10 @@ impl ProjectSubcommand {
                 // Run this inside an async runtime
                 smol::block_on(async {
                     use smol::stream::StreamExt;
-                    let mut build_info = subcmd.try_to_build(project, conf)?.run().await;
+                    let mut build_runner = subcmd.try_to_build(project, conf)?;
+                    let mut build_info = build_runner.run().await;
                     while let Some(info) = build_info.next().await {
-                        println!("{}", Info(info));
+                        println!("{}", BuildInfo(info?));
                     }
                     Ok::<(), largo_core::Error>(())
                 })

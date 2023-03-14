@@ -83,7 +83,7 @@ impl<'a> NewProject<'a> {
         };
         conf::ProjectConfig {
             project: conf::ProjectConfigHead {
-                name: self.name.to_string(),
+                name: self.name,
                 system_settings: conf::SystemSettings::default(),
                 project_settings: conf::ProjectSettings::default(),
             },

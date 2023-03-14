@@ -209,7 +209,7 @@ pub struct Project<'c> {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ProjectConfig<'c> {
-    pub project: ProjectConfigHead,
+    pub project: ProjectConfigHead<'c>,
     pub package: Option<PackageConfig>,
     pub class: Option<ClassConfig>,
     #[serde(rename = "profile", default, borrow)]
@@ -220,8 +220,8 @@ pub struct ProjectConfig<'c> {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct ProjectConfigHead {
-    pub name: String,
+pub struct ProjectConfigHead<'c> {
+    pub name: &'c str,
     #[serde(flatten)]
     pub project_settings: ProjectSettings,
     #[serde(flatten)]
