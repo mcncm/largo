@@ -192,11 +192,14 @@ struct BuildInfo<'c>(largo_core::build::BuildInfo<'c>);
 struct LargoInfo<'c>(&'c largo_core::build::LargoInfo<'c>);
 struct EngineInfo<'c>(&'c largo_core::engines::EngineInfo);
 
-impl<'c> std::fmt::Display for BuildInfo<'c> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<'c> BuildInfo<'c> {
+    fn write<W>(&self, w: &mut W) -> std::result::Result<(), std::io::Error>
+    where
+        W: std::io::Write + termcolor::WriteColor,
+    {
         match &self.0 {
-            build::BuildInfo::LargoInfo(info) => LargoInfo(info).fmt(f),
-            build::BuildInfo::EngineInfo(info) => EngineInfo(info).fmt(f),
+            build::BuildInfo::LargoInfo(info) => LargoInfo(info).write(w),
+            build::BuildInfo::EngineInfo(info) => EngineInfo(info).write(w),
         }
     }
 }
@@ -212,32 +215,50 @@ impl<'c> LargoInfo<'c> {
     }
 }
 
-impl<'c> std::fmt::Display for LargoInfo<'c> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<'c> LargoInfo<'c> {
+    fn write<W>(&self, w: &mut W) -> std::result::Result<(), std::io::Error>
+    where
+        W: std::io::Write + termcolor::WriteColor,
+    {
         use build::LargoInfo::*;
         let info = &self.0;
-        write!(f, "{: >12} ", self.info_name())?;
+        w.set_color(
+            termcolor::ColorSpec::new()
+                .set_fg(Some(termcolor::Color::Green))
+                .set_bold(true),
+        )?;
+        write!(w, "{: >12} ", self.info_name())?;
+        w.reset()?;
         match info {
             Compiling {
                 project,
                 version: _,
                 root,
-            } => write!(f, "{} ({})", project, root.display()),
-            Running { exec } => write!(f, "{}", exec,),
+            } => write!(w, "{} ({})", project, root.display()),
+            Running { exec } => write!(w, "{}", exec,),
             Finished {
                 profile_name,
                 duration,
-            } => write!(f, "`{}` in {:.2}s", profile_name, duration.as_secs_f32()),
+            } => write!(w, "`{}` in {:.2}s", profile_name, duration.as_secs_f32()),
         }
     }
 }
 
-impl<'c> std::fmt::Display for EngineInfo<'c> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<'c> EngineInfo<'c> {
+    fn write<W>(&self, w: &mut W) -> std::result::Result<(), std::io::Error>
+    where
+        W: std::io::Write + termcolor::WriteColor,
+    {
         use largo_core::engines::EngineInfo;
         match &self.0 {
-            EngineInfo::Error { line, msg } => write!(f, "error [{}]: {}", line, msg),
+            EngineInfo::Error { line, msg } => {
+                w.set_color(termcolor::ColorSpec::new().set_fg(Some(termcolor::Color::Red)))?;
+                write!(w, "error [{}]", line)?;
+                w.reset()?;
+                write!(w, ": {}", msg)?;
+            }
         }
+        Ok(())
     }
 }
 
@@ -246,13 +267,17 @@ impl ProjectSubcommand {
         use ProjectSubcommand::*;
         match self {
             Build(subcmd) => {
+                use std::io::Write;
                 // Run this inside an async runtime
                 smol::block_on(async {
                     use smol::stream::StreamExt;
                     let mut build_runner = subcmd.try_to_build(project, conf)?;
                     let mut build_info = build_runner.run().await;
                     while let Some(info) = build_info.next().await {
-                        println!("{}", BuildInfo(info?));
+                        let mut stdout =
+                            termcolor::StandardStream::stdout(termcolor::ColorChoice::Auto);
+                        BuildInfo(info?).write(&mut stdout)?;
+                        writeln!(&mut stdout, "")?;
                     }
                     Ok::<(), largo_core::Error>(())
                 })

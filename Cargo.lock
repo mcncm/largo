@@ -749,6 +749,7 @@ dependencies = [
  "heck",
  "largo_core",
  "smol",
+ "termcolor",
  "typedir",
 ]
 
