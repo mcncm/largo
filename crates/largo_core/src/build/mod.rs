@@ -10,12 +10,10 @@ use crate::vars::LargoVars;
 
 impl<'a> crate::vars::LargoVars<'a> {
     fn from_build_settings(settings: &'a BuildBuilderUnpacked<'a>) -> Self {
-        // NOTE: unfortunate clone
-        let root_dir = settings.root_dir.clone();
         Self {
             profile: settings.profile_name,
             bibliography: settings.conf.bib.bibliography,
-            output_directory: root_dir.extend(()).extend(&settings.profile_name),
+            output_directory: &settings.build_dir,
         }
     }
 }
@@ -76,8 +74,8 @@ impl<'a> BuildBuilder<'a> {
         let project_name = project.config.project.name;
         let root_dir = project.root;
         let src_dir = root_dir.clone().extend(());
-        let build_dir = root_dir.clone().extend(()).extend(&profile_name).extend(());
-        // FIXME This is a bug: there should *always* be a default profile to select
+        let target_dir = root_dir.clone().extend(());
+        let build_dir = target_dir.clone().extend(&profile_name).extend(());
         let mut profiles = project.config.profiles.unwrap_or_default();
         profiles.merge_left(crate::conf::Profiles::standard());
         let profile = profiles
@@ -91,6 +89,7 @@ impl<'a> BuildBuilder<'a> {
             conf,
             root_dir,
             src_dir,
+            target_dir,
             build_dir,
             project_name,
             profile_name,
@@ -114,6 +113,7 @@ struct BuildBuilderUnpacked<'a> {
     conf: &'a LargoConfig<'a>,
     root_dir: P<dirs::RootDir>,
     src_dir: P<dirs::SrcDir>,
+    target_dir: P<dirs::TargetDir>,
     build_dir: P<dirs::BuildDir>,
     profile_name: ProfileName<'a>,
     project_name: &'a str,
@@ -140,7 +140,6 @@ impl<'a> BuildBuilderUnpacked<'a> {
     fn get_engine(&self) -> Result<engines::Engine> {
         use engines::EngineBuilder;
         // FIXME this should happen *at build time*, right?
-        std::fs::create_dir_all(&self.build_dir).expect("TODO: Sorry, this code needs to be refactored; it's a waste of time to handle this error.");
         let largo_vars = LargoVars::from_build_settings(self);
         let eng = self
             .engine_builder()
@@ -163,6 +162,7 @@ impl<'a> BuildBuilderUnpacked<'a> {
         BuildCtx {
             root_dir: self.root_dir,
             src_dir: self.src_dir,
+            target_dir: self.target_dir,
             build_dir: self.build_dir,
             profile_name: self.profile_name,
             project_name: self.project_name,
@@ -182,7 +182,7 @@ pub struct BuildCtx<'a> {
     root_dir: P<dirs::RootDir>,
     #[allow(unused)]
     src_dir: P<dirs::SrcDir>,
-    #[allow(unused)]
+    target_dir: P<dirs::TargetDir>,
     build_dir: P<dirs::BuildDir>,
     profile_name: ProfileName<'a>,
     project_name: &'a str,
@@ -304,12 +304,19 @@ impl<'b> smol::stream::Stream for BuildOutput<'b> {
 }
 
 impl<'c> BuildRunner<'c> {
-    pub async fn run<'a>(&'a mut self) -> BuildOutput {
-        BuildOutput {
+    fn prepare_build_environment(&self) -> Result<()> {
+        // FIXME: ignore error if `CACHEDIR.TAG` already exists
+        let _ = crate::dirs::try_create_target_dir(&self.ctx.target_dir);
+        Ok(std::fs::create_dir_all(&self.ctx.build_dir)?)
+    }
+
+    pub async fn run<'a>(&'a mut self) -> Result<BuildOutput> {
+        self.prepare_build_environment()?;
+        Ok(BuildOutput {
             ctx: &self.ctx,
             engine: &mut self.engine,
             state: BuildState::Init,
             start: std::time::Instant::now(),
-        }
+        })
     }
 }

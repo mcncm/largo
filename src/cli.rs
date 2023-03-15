@@ -1,6 +1,6 @@
 use clap::{Parser, ValueEnum};
 
-use largo_core::{build, conf, dirs, Result};
+use largo_core::{build, conf, dirs, files, Result};
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -272,7 +272,7 @@ impl ProjectSubcommand {
                 smol::block_on(async {
                     use smol::stream::StreamExt;
                     let mut build_runner = subcmd.try_to_build(project, conf)?;
-                    let mut build_info = build_runner.run().await;
+                    let mut build_info = build_runner.run().await?;
                     while let Some(info) = build_info.next().await {
                         let mut stdout =
                             termcolor::StandardStream::stdout(termcolor::ColorChoice::Auto);
@@ -287,7 +287,19 @@ impl ProjectSubcommand {
             // directory if `proj` is constructed.
             Clean { profile } => {
                 let root = project.root;
-                let build_dir = typedir::path!(root => dirs::TargetDir);
+                let mut build_dir = typedir::path!(root => dirs::TargetDir);
+                if build_dir.exists() {
+                    let cache_tag_file = typedir::pathref!(build_dir => dirs::CachedirTagFile);
+                    let contents = std::fs::read_to_string(&cache_tag_file)?;
+                    let sig = files::CACHEDIR_TAG_SIGNATURE;
+                    if &contents[0..sig.len()] != sig {
+                        drop(cache_tag_file);
+                        return Err(anyhow::anyhow!(
+                            "cache signature invalid; will not delete in `{}`",
+                            build_dir.display()
+                        ));
+                    }
+                }
                 match &profile {
                     Some(profile) => {
                         let profile: largo_core::conf::ProfileName = profile.as_str().try_into()?;

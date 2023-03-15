@@ -1,6 +1,6 @@
 # Largo
 
-Largo is a (La)TeX build tool I'm writing to bring an "it just works" experience to my (*my*, not your) TeX projects, namely my papers, talks, and thesis. It was inspired by the eminently pleasant `cargo` build tool for the Rust programming language, and is also written in Rust.
+Largo is a (La)TeX build tool I'm writing to bring an "it just works" experience to my (*my*, not your) TeX projects, namely my papers, talks, and thesis. It was inspired by the eminently pleasant `cargo` build tool for the Rust programming language. In fact, I like `cargo` so much that `largo` is practically a clone, although I've never looked at the source code of the former. You might say it's a bit of `cargo`-cult software.
 
 This project is for my personal use. If you have access to this repository, you're free to use it, too, but understand that there is no implied promise of support, or that I'll ever accept pull requests.
 
@@ -11,7 +11,7 @@ TeX is a staggering achievement of 1970s software engineering that I love to hat
 * Figure out how to use personal TeX packages located at `/some/path` on my machine by setting who-knows-what environment variable.
 * What if I'm using *someone else's* package that's not included in my TeX distribution? I download the files, put them in my source directory, and check them into version control? What if a new version comes out?
 * What about a CTAN package that *is* included in my TeX distribution, but I have the wrong version? Is there no easy way to override it for a single project?
-* More `Makefile` jankery to create separate "`debug`" and "`release`" builds of a document (or "`review`" and "`camera-ready`").
+* More `Makefile` jankery to create separate "`dev`" and "`release`" builds of a document (or "`review`" and "`camera-ready`").
 * Building and distributing a bibliography. I keep a big global reference database in Zotero that routinely exports to `/some/local/path/biblio.bib`. Usually, I just want to use _this_ bibliography, and end up symlinking it into my project directory. This is so annoying; I just want `biber` to know about my global bibliography.
 * Re-figuring-out almost *all* of the above when I realize I want to switch from `pdflatex` to `xelatex` or whatever.
 * Making _other_ tools, like my editor, aware of the cli flags I want for `pdflatex` (or `xelatex` or whatever).
@@ -33,7 +33,7 @@ Largo solves these problems for me, in my way (not yours):
 + Support a bunch of TeX systems, meaning different TeX formats/distributions as well as a variety of TeX engines.
 + Do all of this without trying to change how TeX works, or be a new Tex engine, or anything too drastic. Go with the flow.
 
-Largo is basically a wrapper around the existing command-line tools like `pdftex` and `biber`. It (approximately) accomplishes some (soon, all) of these things without trying to change how TeX works, or be a new TeX engine, or anything too drastic. Go with the flow.
+Largo is basically a wrapper around the existing command-line tools like `pdftex` and `biber`. It (approximately) accomplishes some (soon, all) of these things without trying to change how TeX works, or be a new TeX engine, or anything too drastic. Go with the flow. Break as few packages as possible.
 
 ## Using Largo
 
@@ -43,7 +43,7 @@ myproject
 ├── largo.toml    // project configuration
 ├── src           // source directory
 │   └── main.tex  // TeX entry point
-├── build         // build directory
+├── target        // build directory
 └── ...           // `git` files, etc.
 ```
 To build the project, you can run
@@ -56,20 +56,22 @@ largo build
 Now the build subdirectory will look like,
 
 ``` shell
-build
-└── debug         // default build profile
-    ├── main.aux  // 
+target
+└── dev               // default build profile
     ├── ...
-    └── main.pdf  // finished artifact
+    └── build
+        ├── main.aux  // 
+        ├── ...
+        └── main.pdf  // finished artifact
 ```
 
-where `debug` is the default _build profile_ selected by Largo.
+where `dev` is the default _build profile_ selected by Largo.
 
 ### Largo macros
 Largo passes some information about the build to the TeX engine. This information is exposed through a set of Largo user macros:
 
-* `\LargoProfile`: the build profile, _e.g._ `debug` in the example above. This is particularly useful for conditional compilation.
-* `\LargoOutputDirectory`: the build directory, _e.g._ `./build/debug/` in the example above.
+* `\LargoProfile`: the build profile, _e.g._ `dev` in the example above. This is particularly useful for conditional compilation.
+* `\LargoOutputDirectory`: the build directory, _e.g._ `./target/dev/build/` in the example above.
 * `\LargoBibliography`: the global bibliography, if it is configured in `.largo/config.toml`.
 
 ## Settings and configuration
@@ -96,7 +98,7 @@ largo.url = "git+ssh://git@github.com/mcncm/largo";
 
 to the `inputs` of your configuration. Then the Largo binary package is in the attribute `largo.packages.${system}.default`, where `${system}` is _e.g._ `aarch64-darwin`.
 
-## Packages that require care
+## Packages that require care (or break)
 Some packages don't work "out of the box" with Largo, or need a little massaging.
 + `minted` takes a special option, `outputdir`, that can set as 
   ``` tex
@@ -108,3 +110,6 @@ Some packages don't work "out of the box" with Largo, or need a little massaging
 
 ## Similar projects
 + [tectonic](https://tectonic-typesetting.github.io/en-US/) has many of the same goals. It looks pretty neat. But it also tries to reimagine more of how TeX works. It tries to implement fancy things like HTML output. It's very opinionated and cuts against the grain. I found it harder to integrate into the "rest of the world". I just wanted a tool that does what I want as simply as possible.
++ [ltx2any](https://github.com/reitzig/ltx2any)
++ [rubber](https://launchpad.net/rubber/)
++ [latexmk](https://ctan.org/pkg/latexmk), distributed as part of TeX Live and MikTeX.

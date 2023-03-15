@@ -12,6 +12,7 @@ pub const PROJECT_CONFIG_FILE: &str = "largo.toml";
 pub const LOCK_FILE: &str = "largo.lock";
 pub const GITIGNORE: &str = ".gitignore";
 pub const GIT_DIR: &str = ".git";
+pub const CACHEDIR_TAG_FILE: &str = "CACHEDIR.TAG";
 
 // Largo
 pub const CONFIG_DIR: &str = ".largo";
@@ -42,6 +43,7 @@ typedir::typedir! {
             forall s: &str, s => node SrcFile;
         };
         TARGET_DIR => node TargetDir {
+            CACHEDIR_TAG_FILE => node CachedirTagFile;
             forall s: &crate::conf::ProfileName<'_>, s.as_ref() => node ProfileTargetDir {
                 DEPS_DIR => node DepsDir;
                 BUILD_DIR => node BuildDir;
@@ -115,7 +117,10 @@ impl<'a> NewProject<'a> {
             }
             ProjectKind::Document => {
                 let src_file: R<SrcFile> = src_dir.extend("main.tex");
-                try_create(&src_file, ToCreate::File(crate::files::MAIN_LATEX))
+                try_create(
+                    &src_file,
+                    ToCreate::File(crate::files::MAIN_LATEX.as_bytes()),
+                )
             }
         }
     }
@@ -139,7 +144,10 @@ impl<'a> NewProject<'a> {
         // Gitignore
         {
             let gitignore = pathref!(root => Gitignore);
-            try_create(&gitignore, ToCreate::File(crate::files::GITIGNORE))?;
+            try_create(
+                &gitignore,
+                ToCreate::File(crate::files::GITIGNORE.as_bytes()),
+            )?;
         }
         // Source
         {
@@ -148,10 +156,18 @@ impl<'a> NewProject<'a> {
             self.try_create_src_file(&mut src_dir)?;
         }
         // Build directory
-        let build_dir = path!(root => TargetDir);
-        try_create(&build_dir, ToCreate::Dir)?;
-        Ok(())
+        let target_dir = path!(root => TargetDir);
+        try_create_target_dir(&target_dir)
     }
+}
+
+pub fn try_create_target_dir(target_dir: &P<TargetDir>) -> Result<()> {
+    std::fs::create_dir_all(&target_dir)?;
+    let cachedir_tag_file: P<CachedirTagFile> = target_dir.clone().extend(());
+    try_create(
+        &cachedir_tag_file,
+        ToCreate::File(crate::files::CACHEDIR_TAG.as_bytes()),
+    )
 }
 
 impl RootDir {
