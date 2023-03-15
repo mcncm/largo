@@ -33,9 +33,11 @@ impl smol::stream::Stream for EngineOutput {
         use smol::stream::StreamExt;
         use std::task::Poll;
         match self.lines.poll_next(cx) {
-            Poll::Ready(Some(Ok(line))) => {
-                if line.starts_with('!') {
-                    let info = EngineInfo::Error { line: 0, msg: line };
+            Poll::Ready(Some(Ok(mut line))) => {
+                if line.starts_with("! ") {
+                    // First two characters are "! "
+                    let msg = line.split_off(2);
+                    let info = EngineInfo::Error { line: 0, msg };
                     Poll::Ready(Some(info.into()))
                 } else {
                     cx.waker().wake_by_ref();
