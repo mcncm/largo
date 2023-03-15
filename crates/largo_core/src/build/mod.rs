@@ -200,7 +200,7 @@ pub enum LargoInfo<'c> {
         root: &'c std::path::Path,
     },
     Running {
-        exec: crate::conf::Executable<'c>,
+        exec: &'static str,
     },
     Finished {
         profile_name: ProfileName<'c>,
@@ -234,6 +234,7 @@ pub struct BuildRunner<'c> {
 
 enum BuildState {
     Init,
+    StartEngine,
     EngineRunning(crate::engines::EngineOutput),
     Finished,
     Exit,
@@ -262,14 +263,20 @@ impl<'b> smol::stream::Stream for BuildOutput<'b> {
                     root: &self.ctx.root_dir,
                 }
                 .into();
-                match self.engine.run() {
-                    Result::Ok(engine_output) => {
-                        self.state = BuildState::EngineRunning(engine_output);
-                        Poll::Ready(Some(Ok(info)))
-                    }
-                    Result::Err(err) => Poll::Ready(Some(Err(err.into()))),
-                }
+                self.state = BuildState::StartEngine;
+                Poll::Ready(Some(Ok(info)))
             }
+            BuildState::StartEngine => match self.engine.run() {
+                Result::Ok(engine_output) => {
+                    self.state = BuildState::EngineRunning(engine_output);
+                    let info = LargoInfo::Running {
+                        exec: "(TODO) tex engine",
+                    }
+                    .into();
+                    Poll::Ready(Some(Ok(info)))
+                }
+                Result::Err(err) => Poll::Ready(Some(Err(err.into()))),
+            },
             BuildState::EngineRunning(ref mut engine_output) => {
                 match smol::stream::StreamExt::poll_next(engine_output, cx) {
                     Poll::Ready(Some(engine_info)) => Poll::Ready(Some(Ok(engine_info.into()))),

@@ -51,7 +51,7 @@ pub enum BibEngine {
     Biber,
 }
 
-#[derive(Debug, Deserialize, Serialize, Merge)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize, Merge)]
 pub struct Executable<'c>(&'c str);
 
 impl<'c> AsRef<str> for Executable<'c> {

@@ -223,11 +223,7 @@ impl<'c> std::fmt::Display for LargoInfo<'c> {
                 version: _,
                 root,
             } => write!(f, "{} ({})", project, root.display()),
-            Running { exec } => write!(
-                f,
-                "{}",
-                <largo_core::conf::Executable<'_> as AsRef<str>>::as_ref(exec)
-            ),
+            Running { exec } => write!(f, "{}", exec,),
             Finished {
                 profile_name,
                 duration,

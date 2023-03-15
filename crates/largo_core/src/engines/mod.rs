@@ -33,10 +33,16 @@ impl smol::stream::Stream for EngineOutput {
         use smol::stream::StreamExt;
         use std::task::Poll;
         match self.lines.poll_next(cx) {
-            Poll::Ready(Some(_line)) => {
-                cx.waker().wake_by_ref();
-                Poll::Pending
+            Poll::Ready(Some(Ok(line))) => {
+                if line.starts_with('!') {
+                    let info = EngineInfo::Error { line: 0, msg: line };
+                    Poll::Ready(Some(info.into()))
+                } else {
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                }
             }
+            Poll::Ready(Some(Err(_err))) => panic!("unexpected error"),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => {
                 cx.waker().wake_by_ref();
