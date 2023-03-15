@@ -292,12 +292,15 @@ impl ProjectSubcommand {
                     let cache_tag_file = typedir::pathref!(build_dir => dirs::CachedirTagFile);
                     let contents = std::fs::read_to_string(&cache_tag_file)?;
                     let sig = files::CACHEDIR_TAG_SIGNATURE;
-                    if &contents[0..sig.len()] != sig {
-                        drop(cache_tag_file);
-                        return Err(anyhow::anyhow!(
-                            "cache signature invalid; will not delete in `{}`",
-                            build_dir.display()
-                        ));
+                    match contents.get(0..sig.len()) {
+                        Some(s) if s == sig => (),
+                        _ => {
+                            drop(cache_tag_file);
+                            return Err(anyhow::anyhow!(
+                                "cache signature invalid; will not delete in `{}`",
+                                build_dir.display()
+                            ));
+                        }
                     }
                 }
                 match &profile {
