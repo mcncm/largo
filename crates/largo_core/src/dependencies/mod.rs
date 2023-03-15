@@ -2,6 +2,8 @@
 
 pub type DependencyPath = std::path::PathBuf;
 
+pub mod ctan;
+
 pub fn get_dependency_paths(deps: &crate::conf::Dependencies) -> Vec<DependencyPath> {
     use crate::conf::DependencyKind;
     deps.into_iter()
