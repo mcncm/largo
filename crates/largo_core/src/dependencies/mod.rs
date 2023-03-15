@@ -4,6 +4,8 @@ pub type DependencyPath = std::path::PathBuf;
 
 pub mod ctan;
 
+use crate::Result;
+
 pub fn get_dependency_paths(deps: &crate::conf::Dependencies) -> Vec<DependencyPath> {
     use crate::conf::DependencyKind;
     deps.into_iter()
@@ -16,4 +18,21 @@ pub fn get_dependency_paths(deps: &crate::conf::Dependencies) -> Vec<DependencyP
             }
         })
         .collect()
+}
+
+#[allow(unused)]
+pub struct WebClient<'w> {
+    inner: reqwest::Client,
+    ctan_root_url: &'w str,
+}
+
+impl<'w> WebClient<'w> {
+    #[allow(dead_code)]
+    fn new() -> Result<Self> {
+        let inner = reqwest::Client::builder().build()?;
+        Ok(Self {
+            inner,
+            ctan_root_url: "https://www.ctan.org/",
+        })
+    }
 }
