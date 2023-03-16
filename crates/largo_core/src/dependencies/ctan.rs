@@ -65,8 +65,13 @@ pub struct Package {
 
     /// An inner tag of <description> is <ref>. It is used to reference a
     /// package. The tag may have an attribute:
+    ///
+    /// NOTE: I am pretty sure that this isn't *actually* a field in the json
+    /// object, despite what the spec says. For now I'm wrapping it in an
+    /// `Option` and skipping it.
     #[serde(rename = "<ref>")]
-    r#ref: DescriptionRef,
+    #[serde(skip)]
+    r#ref: Option<DescriptionRef>,
 
     /// The entry has the list attribute documentation. The list elements
     /// indicate references to documentation. The objects may have attributes:
@@ -204,7 +209,10 @@ pub struct Copyright {
 
     /// This attribute contains the year or years of the copyright. This
     /// attribute is mandatory.
-    year: Year,
+    ///
+    /// NOTE: Although this attribvute is described as mandatory, it's absent
+    /// even from the example package (`tex`) described in the API doc!
+    year: Option<Year>,
 }
 
 /// At least one of number or date have to be given. Otherwise the tag is
@@ -221,6 +229,7 @@ pub struct Version {
 
 /// The value can be either a string or a list of strings with keys of licenses.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
 pub enum License {
     String(String),
     /// FIXME: I don't really know what they want here.
@@ -230,6 +239,11 @@ pub enum License {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Description {
     /// This attribute contains the longer description of the package. It may include HTML markup.
+    ///
+    /// NOTE: the API spec says that this field should be called `description`,
+    /// but the very example package (`tex`) described by the spec does not
+    /// conform; instead, this field is called `text`.
+    #[serde(rename = "text")]
     description: String,
     /// This attribute contains the ISO code for the language of the
     /// description. Alternately it may be null to indicate the default
@@ -281,26 +295,44 @@ pub struct Install {
     path: RelativePath,
 }
 
+/// NOTE: According to the spec, this is supposed to contain a field. However,
+/// it's simply a string for the example package (`tex`) that the spec talks about.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(from = "String")]
 pub struct Miktex {
     /// This attribute contains name of the package in MiKTEX. This attribute is mandatory.
     location: String,
 }
 
+impl From<String> for Miktex {
+    fn from(location: String) -> Self {
+        Self { location }
+    }
+}
+
+/// NOTE: According to the spec, this is supposed to contain a field. However,
+/// it's simply a string for the example package (`tex`) that the spec talks about.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(from = "String")]
 pub struct Texlive {
     /// This attribute contains name of the package in TEX Live. This attribute is mandatory.
     location: String,
+}
+
+impl From<String> for Texlive {
+    fn from(location: String) -> Self {
+        Self { location }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::super::WebClient;
 
-    #[test]
-    fn get_pkg_metadata_works() {
+    #[tokio::test]
+    async fn get_pkg_metadata_works() {
         let client = WebClient::new().unwrap();
-        let pkg = smol::block_on(async { client.get_ctan_pkg_metadata("tex").await.unwrap() });
+        let pkg = client.get_ctan_pkg_metadata("tex").await.unwrap();
         assert_eq!(&pkg.authors[0].id, "knuth");
     }
 }
