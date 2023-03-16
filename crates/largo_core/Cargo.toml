@@ -9,11 +9,12 @@ edition = "2021"
 serde = { version = "1.0", features = [ "derive" ] }
 toml = { version = "0.5.9", features = [ "preserve_order" ] }
 reqwest = { version = "0.11", features = [ "json" ] }
-smol = "*"
+tokio = { version = "*", features = [ "rt", "macros" ] }
+tokio-stream = { version = "*", features = [ "io-util" ] }
 chrono = "0.4"
 itertools = "0.10"
 thiserror = "1.0"
 anyhow = "*"
 typedir = { path = "../typedir" }
 merge = { path = "../merge" }
-clam = { path = "../clam", features = [ "async-process" ] }
+clam = { path = "../clam", features = [ "tokio" ] }

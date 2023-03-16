@@ -9,4 +9,4 @@ pub mod vars;
 
 pub use anyhow::Error;
 pub use anyhow::Result;
-pub use smol::process::Command;
+pub use tokio::process::Command;

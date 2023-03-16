@@ -14,7 +14,8 @@ lto = true
 largo_core = { path = "crates/largo_core" }
 typedir = { path = "crates/typedir" }
 clap = { version = "4.0", features = [ "derive" ] }
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
 termcolor = "*"
 anyhow = "1.0"
-smol = "1.3"
 heck = "0.4"

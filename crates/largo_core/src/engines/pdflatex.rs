@@ -89,8 +89,8 @@ impl EngineBuilder for PdflatexBuilder {
         texinputs += ":";
         cmd.env("TEXINPUTS", &texinputs);
         // Pipe the output
-        cmd.stderr(smol::process::Stdio::piped())
-            .stdout(smol::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped());
         // What to do with the output
         clam::Options::apply(self.cli_options, &mut cmd);
         // The actual input to the tex program

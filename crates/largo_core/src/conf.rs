@@ -179,8 +179,7 @@ pub fn with_config<T, F: FnOnce(&LargoConfig, Option<crate::conf::Project>) -> T
     let global_config_file = typedir::path!(global_config_dir => dirs::LargoConfigFile);
     // TODO: shouldn't crash if you have no config file; instead, just give you
     // the default config.
-    let global_config_contents =
-        dirs::LargoConfigFile::try_read(&global_config_file).expect("here's the bug boss");
+    let global_config_contents = dirs::LargoConfigFile::try_read(&global_config_file)?;
     let global_config = LargoConfig::new(&global_config_contents)?;
 
     // Project configuration

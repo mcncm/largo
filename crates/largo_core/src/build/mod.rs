@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use tokio_stream as stream;
 
 use typedir::{Extend, PathBuf as P};
 
@@ -249,7 +250,7 @@ pub struct BuildOutput<'b> {
     start: std::time::Instant,
 }
 
-impl<'b> smol::stream::Stream for BuildOutput<'b> {
+impl<'b> stream::Stream for BuildOutput<'b> {
     type Item = Result<BuildInfo<'b>>;
 
     fn poll_next(
@@ -280,7 +281,7 @@ impl<'b> smol::stream::Stream for BuildOutput<'b> {
                 Result::Err(err) => Poll::Ready(Some(Err(err.into()))),
             },
             BuildState::EngineRunning(ref mut engine_output) => {
-                match smol::stream::StreamExt::poll_next(engine_output, cx) {
+                match std::pin::Pin::new(engine_output).poll_next(cx) {
                     Poll::Ready(Some(engine_info)) => Poll::Ready(Some(Ok(engine_info.into()))),
                     Poll::Ready(None) => {
                         self.state = BuildState::Finished;

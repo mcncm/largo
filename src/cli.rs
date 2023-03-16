@@ -263,24 +263,26 @@ impl<'c> EngineInfo<'c> {
 }
 
 impl ProjectSubcommand {
-    fn execute(&self, project: conf::Project, conf: &conf::LargoConfig) -> Result<()> {
+    async fn execute(
+        &self,
+        project: conf::Project<'_>,
+        conf: &conf::LargoConfig<'_>,
+    ) -> Result<()> {
         use ProjectSubcommand::*;
         match self {
             Build(subcmd) => {
                 use std::io::Write;
+                use tokio_stream::StreamExt;
                 // Run this inside an async runtime
-                smol::block_on(async {
-                    use smol::stream::StreamExt;
-                    let mut build_runner = subcmd.try_to_build(project, conf)?;
-                    let mut build_info = build_runner.run().await?;
-                    while let Some(info) = build_info.next().await {
-                        let mut stdout =
-                            termcolor::StandardStream::stdout(termcolor::ColorChoice::Auto);
-                        BuildInfo(info?).write(&mut stdout)?;
-                        writeln!(&mut stdout, "")?;
-                    }
-                    Ok::<(), largo_core::Error>(())
-                })
+                let mut build_runner = subcmd.try_to_build(project, conf)?;
+                let mut build_info = build_runner.run().await?;
+                while let Some(info) = build_info.next().await {
+                    let mut stdout =
+                        termcolor::StandardStream::stdout(termcolor::ColorChoice::Auto);
+                    BuildInfo(info?).write(&mut stdout)?;
+                    writeln!(&mut stdout, "")?;
+                }
+                Ok::<(), largo_core::Error>(())
             }
             // the `Project` is (reasonable) proof that it is a valid project:
             // the manifest file parses. It's *reasonably* safe to delete a
@@ -334,17 +336,27 @@ impl ProjectSubcommand {
 
 impl Subcommand {
     fn execute(self) -> Result<()> {
-        match self {
-            Subcommand::Create(subcmd) => subcmd.execute(),
-            Subcommand::Project(subcmd) => conf::with_config(|conf, proj| match proj {
-                Some(proj) => subcmd.execute(proj, conf),
-                None => Err(anyhow::anyhow!("no enclosing project found")),
-            })?,
-            // This subcommand only exists in debug builds
-            #[cfg(debug_assertions)]
-            Subcommand::DebugLargo => conf::with_config(|conf, _| {
-                println!("{:#?}", conf);
-            }),
-        }
+        // We start the async runtime here because we get the config files here,
+        // and they have bounded lifetimes. This isn't the only solution; for
+        // example, we could instead inline the construction of the config data
+        // (and thereby read those files asynchronously).
+        conf::with_config(|conf, proj| {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(async {
+                    match self {
+                        Subcommand::Create(subcmd) => subcmd.execute(),
+                        Subcommand::Project(subcmd) => match proj {
+                            Some(proj) => subcmd.execute(proj, conf).await,
+                            None => Err(anyhow::anyhow!("no enclosing project found")),
+                        },
+                        // This subcommand only exists in debug builds
+                        #[cfg(debug_assertions)]
+                        Subcommand::DebugLargo => Ok(println!("{:#?}", &conf)),
+                    }
+                })
+        })?
     }
 }

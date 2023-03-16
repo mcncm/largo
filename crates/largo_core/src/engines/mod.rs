@@ -1,6 +1,9 @@
+use std::{pin::Pin, task::Poll};
+
 use crate::{build, dirs, Result};
 
-use smol::{io::BufReader, process::ChildStdout};
+use tokio::{io::BufReader, process::ChildStdout};
+use tokio_stream as stream;
 
 pub mod pdflatex;
 
@@ -20,19 +23,17 @@ pub enum EngineInfo {
 
 #[derive(Debug)]
 pub struct EngineOutput {
-    lines: smol::io::Lines<BufReader<ChildStdout>>,
+    lines: tokio_stream::wrappers::LinesStream<BufReader<ChildStdout>>,
 }
 
-impl smol::stream::Stream for EngineOutput {
+impl stream::Stream for EngineOutput {
     type Item = EngineInfo;
 
     fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        use smol::stream::StreamExt;
-        use std::task::Poll;
-        match self.lines.poll_next(cx) {
+    ) -> Poll<Option<Self::Item>> {
+        match Pin::new(&mut self.lines).poll_next(cx) {
             Poll::Ready(Some(Ok(mut line))) => {
                 if line.starts_with("! ") {
                     // First two characters are "! "
@@ -56,9 +57,9 @@ impl smol::stream::Stream for EngineOutput {
 
 impl Engine {
     pub fn run(&mut self) -> Result<EngineOutput> {
-        use smol::prelude::*;
+        use tokio::io::AsyncBufReadExt;
         let stdout = self.run_inner()?;
-        let lines = stdout.lines();
+        let lines = tokio_stream::wrappers::LinesStream::new(stdout.lines());
         Ok(EngineOutput { lines })
     }
 
@@ -66,7 +67,7 @@ impl Engine {
         // `async_process::Child` does not require a manual call to `.wait()`.
         let mut child = self.cmd.spawn()?;
         let stdout = child.stdout.take().expect("failed to take child's stdout");
-        Ok(smol::io::BufReader::new(stdout))
+        Ok(tokio::io::BufReader::new(stdout))
     }
 }
 

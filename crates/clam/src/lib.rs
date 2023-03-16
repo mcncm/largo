@@ -38,6 +38,21 @@ impl Command for async_process::Command {
     }
 }
 
+#[cfg(feature = "tokio")]
+impl Command for tokio::process::Command {
+    fn arg<S: AsRef<std::ffi::OsStr>>(&mut self, arg: S) -> &mut Self {
+        self.arg(arg)
+    }
+
+    fn args<I, S>(&mut self, args: I) -> &mut Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<std::ffi::OsStr>,
+    {
+        self.args(args)
+    }
+}
+
 pub trait Options {
     fn apply<C: Command>(self, cmd: &mut C);
 }
