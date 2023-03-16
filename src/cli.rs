@@ -289,31 +289,43 @@ impl ProjectSubcommand {
             // directory if `proj` is constructed.
             Clean { profile } => {
                 let root = project.root;
-                let mut build_dir = typedir::path!(root => dirs::TargetDir);
-                if build_dir.exists() {
-                    let cache_tag_file = typedir::pathref!(build_dir => dirs::CachedirTagFile);
-                    let contents = std::fs::read_to_string(&cache_tag_file)?;
-                    let sig = files::CACHEDIR_TAG_SIGNATURE;
-                    match contents.get(0..sig.len()) {
-                        Some(s) if s == sig => (),
-                        _ => {
-                            drop(cache_tag_file);
-                            return Err(anyhow::anyhow!(
-                                "cache signature invalid; will not delete in `{}`",
-                                build_dir.display()
-                            ));
-                        }
+                let mut target_dir = typedir::path!(root => dirs::TargetDir);
+                let cwd = std::env::current_dir().expect("no current directory");
+
+                if !cwd.starts_with(&target_dir) {
+                    return Err(anyhow::anyhow!(
+                        "currently within `{}`, not deleting",
+                        &target_dir.display()
+                    ));
+                }
+
+                // Check the correctenss of the cache tag
+                let expected = files::CACHEDIR_TAG_SIGNATURE;
+                let contents = {
+                    let cache_tag_file = typedir::pathref!(target_dir => dirs::CachedirTagFile);
+                    std::fs::read_to_string(&cache_tag_file)
+                };
+                let sig = contents.as_ref().and_then(|c| Ok(c.get(0..expected.len())));
+                match sig {
+                    Ok(Some(sig)) if sig == expected => (),
+                    _ => {
+                        return Err(anyhow::anyhow!(
+                            "invalid cache signature, not deleting `{}`",
+                            target_dir.display()
+                        ));
                     }
                 }
+
+                // Now actually delete the directory
                 match &profile {
                     Some(profile) => {
                         let profile: largo_core::conf::ProfileName = profile.as_str().try_into()?;
                         use typedir::Extend;
                         let profile_dir: typedir::PathBuf<dirs::ProfileTargetDir> =
-                            build_dir.extend(&profile);
+                            target_dir.extend(&profile);
                         dirs::remove_dir_all(&profile_dir)
                     }
-                    None => dirs::remove_dir_all(&build_dir),
+                    None => dirs::remove_dir_all(&target_dir),
                 }
             }
             Eject => todo!(),
