@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use super::{private::CommandBuilder, Engine, EngineBuilder};
-use crate::dirs;
+use crate::{dirs, Result};
 
 pub struct PdflatexBuilder {
     cmd: crate::Command,
@@ -56,14 +56,19 @@ impl EngineBuilder for PdflatexBuilder {
         self
     }
 
-    fn with_synctex(mut self, use_synctex: bool) -> crate::Result<Self> {
+    fn with_synctex(mut self, use_synctex: bool) -> Result<Self> {
         if use_synctex {
             self.cli_options.synctex = Some(SYNCTEX_GZIPPED);
         }
         Ok(self)
     }
 
-    fn with_shell_escape(mut self, shell_escape: Option<bool>) -> crate::Result<Self> {
+    fn with_jobname(mut self, jobname: String) -> Result<Self> {
+        self.cli_options.jobname = Some(jobname);
+        Ok(self)
+    }
+
+    fn with_shell_escape(mut self, shell_escape: Option<bool>) -> Result<Self> {
         match shell_escape {
             Some(true) => {
                 self.cli_options.shell_escape = true;

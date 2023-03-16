@@ -62,7 +62,7 @@ impl Engine {
         Ok(EngineOutput { lines })
     }
 
-    fn run_inner(&mut self) -> crate::Result<BufReader<ChildStdout>> {
+    fn run_inner(&mut self) -> Result<BufReader<ChildStdout>> {
         // `async_process::Child` does not require a manual call to `.wait()`.
         let mut child = self.cmd.spawn()?;
         let stdout = child.stdout.take().expect("failed to take child's stdout");
@@ -91,12 +91,14 @@ pub trait EngineBuilder: private::CommandBuilder + Sized {
 
     fn with_verbosity(self, verbosity: &build::Verbosity) -> Self;
 
-    fn with_synctex(self, use_synctex: bool) -> crate::Result<Self>;
+    fn with_synctex(self, use_synctex: bool) -> Result<Self>;
 
     /// This function takes an `Option<bool>` because many TeX engines have two
     /// flags, `-shell-escape` and `-no-shell-escape`, and I'm not sure they
     /// aren't simple opposites.
-    fn with_shell_escape(self, shell_escape: Option<bool>) -> crate::Result<Self>;
+    fn with_shell_escape(self, shell_escape: Option<bool>) -> Result<Self>;
+
+    fn with_jobname(self, jobname: String) -> Result<Self>;
 
     fn with_dependencies(mut self, deps: &DependencyPaths) -> Self {
         use itertools::Itertools;
