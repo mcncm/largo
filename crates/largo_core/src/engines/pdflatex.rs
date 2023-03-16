@@ -5,8 +5,7 @@ use crate::dirs;
 
 pub struct PdflatexBuilder {
     cmd: crate::Command,
-    /// The `\input{main.tex}` that should terminate the tex input
-    input: String,
+    texinputs: Vec<String>,
     cli_options: CommandLineOptions,
 }
 
@@ -34,7 +33,7 @@ impl PdflatexBuilder {
         Self {
             cmd,
             cli_options,
-            input: String::new(),
+            texinputs: Vec::new(),
         }
     }
 
@@ -43,17 +42,12 @@ impl PdflatexBuilder {
         // &'static str, and without an allocation.
         self.cmd.env("max_print_line", &i32::MAX.to_string());
     }
-
-    fn finish_input(&mut self) {
-        self.input.push_str(r#"\input{"#);
-        self.input.push_str(dirs::MAIN_FILE);
-        self.input.push('}');
-    }
 }
 
 impl EngineBuilder for PdflatexBuilder {
-    fn with_output_dir<P: typedir::AsPath<dirs::BuildDir>>(mut self, path: P) -> Self {
-        self.cli_options.output_directory = Some(path.to_path_buf());
+    fn with_src_dir<P: typedir::AsPath<dirs::SrcDir>>(mut self, path: P) -> Self {
+        // FIXME: unnecessary allocation
+        self.texinputs.push(format!("{}", path.as_ref().display()));
         self
     }
 
@@ -65,21 +59,6 @@ impl EngineBuilder for PdflatexBuilder {
     fn with_synctex(mut self, use_synctex: bool) -> crate::Result<Self> {
         if use_synctex {
             self.cli_options.synctex = Some(SYNCTEX_GZIPPED);
-        }
-        Ok(self)
-    }
-
-    // FIXME: Just do this with macros.
-    fn with_largo_vars(mut self, vars: &crate::vars::LargoVars) -> crate::Result<Self> {
-        use std::fmt::Write;
-        write!(self.input, r#"\def\LargoProfile{{{}}}"#, vars.profile)?;
-        write!(
-            self.input,
-            r#"\def\LargoOutputDirectory{{{}}}"#,
-            vars.output_directory.display()
-        )?;
-        if let Some(bib) = &vars.bibliography {
-            write!(self.input, r#"\def\LargoBibliography{{{}}}"#, bib)?;
         }
         Ok(self)
     }
@@ -98,16 +77,19 @@ impl EngineBuilder for PdflatexBuilder {
     }
 
     fn finish(mut self) -> Engine {
+        // Appy environment variables
         self.disable_line_wrapping();
-        self.finish_input();
-
         let mut cmd = self.cmd;
+        let mut texinputs = self.texinputs.join(":");
+        texinputs += ":";
+        cmd.env("TEXINPUTS", &texinputs);
+        // Pipe the output
         cmd.stderr(smol::process::Stdio::piped())
             .stdout(smol::process::Stdio::piped());
         // What to do with the output
         clam::Options::apply(self.cli_options, &mut cmd);
         // The actual input to the tex program
-        cmd.arg(&self.input);
+        cmd.arg(dirs::START_FILE);
         Engine { cmd }
     }
 }

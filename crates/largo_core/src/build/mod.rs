@@ -9,11 +9,12 @@ use crate::engines;
 use crate::vars::LargoVars;
 
 impl<'a> crate::vars::LargoVars<'a> {
-    fn from_build_settings(settings: &'a BuildBuilderUnpacked<'a>) -> Self {
+    fn from_build_settings<'b>(settings: &'b BuildBuilderUnpacked<'a>) -> Self {
         Self {
             profile: settings.profile_name,
             bibliography: settings.conf.bib.bibliography,
-            output_directory: &settings.build_dir,
+            // FIXME: unnecessary allocation
+            output_directory: settings.build_dir.clone(),
         }
     }
 }
@@ -139,16 +140,13 @@ impl<'a> BuildBuilderUnpacked<'a> {
 
     fn get_engine(&self) -> Result<engines::Engine> {
         use engines::EngineBuilder;
-        // FIXME this should happen *at build time*, right?
-        let largo_vars = LargoVars::from_build_settings(self);
         let eng = self
             .engine_builder()
             // Yes, these are extraneous clones. I want to be sure first what
             // lifetime the `Engine` should really have.
             .with_src_dir(self.src_dir.clone())
-            .with_output_dir(self.build_dir.clone())
+            .with_build_dir(self.build_dir.clone())
             .with_verbosity(&self.verbosity)
-            .with_largo_vars(&largo_vars)?
             .with_synctex(self.project_settings.synctex.unwrap_or_default())?
             .with_shell_escape(self.project_settings.shell_escape)?
             .with_dependencies(&crate::dependencies::get_dependency_paths(
@@ -159,6 +157,8 @@ impl<'a> BuildBuilderUnpacked<'a> {
     }
 
     fn into_ctx(self) -> BuildCtx<'a> {
+        // FIXME this should happen *at build time*, right?
+        let largo_vars = LargoVars::from_build_settings(&self);
         BuildCtx {
             root_dir: self.root_dir,
             src_dir: self.src_dir,
@@ -166,6 +166,7 @@ impl<'a> BuildBuilderUnpacked<'a> {
             build_dir: self.build_dir,
             profile_name: self.profile_name,
             project_name: self.project_name,
+            vars: largo_vars,
             verbosity: self.verbosity,
         }
     }
@@ -186,6 +187,7 @@ pub struct BuildCtx<'a> {
     build_dir: P<dirs::BuildDir>,
     profile_name: ProfileName<'a>,
     project_name: &'a str,
+    vars: LargoVars<'a>,
     #[allow(unused)]
     verbosity: Verbosity,
 }
@@ -304,10 +306,36 @@ impl<'b> smol::stream::Stream for BuildOutput<'b> {
 }
 
 impl<'c> BuildRunner<'c> {
+    // FIXME: Just do this with macros.
+    fn write_largo_vars<W: std::io::Write>(&self, w: &mut W) -> Result<()> {
+        let vars = &self.ctx.vars;
+        write!(w, r#"\def\LargoProfile{{{}}}"#, vars.profile)?;
+        write!(
+            w,
+            r#"\def\LargoOutputDirectory{{{}}}"#,
+            vars.output_directory.display()
+        )?;
+        if let Some(bib) = &vars.bibliography {
+            write!(w, r#"\def\LargoBibliography{{{}}}"#, bib)?;
+        }
+        Ok(())
+    }
+
+    fn write_start_file<W: std::io::Write>(&self, w: &mut W) -> Result<()> {
+        self.write_largo_vars(w)?;
+        write!(w, r"\input{{{}}}", dirs::MAIN_FILE)?;
+        Ok(())
+    }
+
     fn prepare_build_environment(&self) -> Result<()> {
         // FIXME: ignore error if `CACHEDIR.TAG` already exists
         let _ = crate::dirs::try_create_target_dir(&self.ctx.target_dir);
-        Ok(std::fs::create_dir_all(&self.ctx.build_dir)?)
+        std::fs::create_dir_all(&self.ctx.build_dir)?;
+        // Create the `_start.tex` file
+        let start_file: P<dirs::StartFile> = self.ctx.build_dir.clone().extend(());
+        let mut f = std::fs::File::create(&start_file)?;
+        self.write_start_file(&mut f)?;
+        Ok(())
     }
 
     pub async fn run<'a>(&'a mut self) -> Result<BuildOutput> {

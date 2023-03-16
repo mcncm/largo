@@ -82,18 +82,16 @@ mod private {
 
 /// An interface for cunstructing TeX engines
 pub trait EngineBuilder: private::CommandBuilder + Sized {
-    fn with_src_dir<P: typedir::AsPath<dirs::SrcDir>>(mut self, dir: P) -> Self {
+    fn with_src_dir<P: typedir::AsPath<dirs::SrcDir>>(self, dir: P) -> Self;
+
+    fn with_build_dir<P: typedir::AsPath<dirs::BuildDir>>(mut self, dir: P) -> Self {
         self.inner_cmd_mut().current_dir(dir);
         self
     }
 
-    fn with_output_dir<P: typedir::AsPath<dirs::BuildDir>>(self, path: P) -> Self;
-
     fn with_verbosity(self, verbosity: &build::Verbosity) -> Self;
 
     fn with_synctex(self, use_synctex: bool) -> crate::Result<Self>;
-
-    fn with_largo_vars(self, vars: &crate::vars::LargoVars) -> crate::Result<Self>;
 
     /// This function takes an `Option<bool>` because many TeX engines have two
     /// flags, `-shell-escape` and `-no-shell-escape`, and I'm not sure they

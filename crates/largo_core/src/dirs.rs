@@ -7,6 +7,7 @@ pub const SRC_DIR: &str = "src";
 pub const MAIN_FILE: &str = "main.tex";
 pub const TARGET_DIR: &str = "target";
 pub const BUILD_DIR: &str = "build";
+pub const START_FILE: &str = "_start.tex";
 pub const DEPS_DIR: &str = "deps";
 pub const PROJECT_CONFIG_FILE: &str = "largo.toml";
 pub const LOCK_FILE: &str = "largo.lock";
@@ -46,7 +47,9 @@ typedir::typedir! {
             CACHEDIR_TAG_FILE => node CachedirTagFile;
             forall s: &crate::conf::ProfileName<'_>, s.as_ref() => node ProfileTargetDir {
                 DEPS_DIR => node DepsDir;
-                BUILD_DIR => node BuildDir;
+                BUILD_DIR => node BuildDir {
+                    START_FILE => node StartFile;
+                };
             };
         };
         GIT_DIR => node GitDir;

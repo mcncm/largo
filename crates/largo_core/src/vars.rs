@@ -9,7 +9,8 @@ use typedir::PathBuf as P;
 pub struct LargoVars<'a> {
     pub profile: ProfileName<'a>,
     pub bibliography: Option<&'a str>,
-    pub output_directory: &'a P<dirs::BuildDir>,
+    /// FIXME: ideally this should be borrowed, and no allocation necessary
+    pub output_directory: P<dirs::BuildDir>,
 }
 
 // For use in `LargoVars::to_defs`
