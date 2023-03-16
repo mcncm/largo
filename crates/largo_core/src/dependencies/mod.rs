@@ -7,9 +7,29 @@ use crate::{
 
 use futures::stream::futures_unordered::FuturesUnordered;
 
+use self::ctan::CtanLocation;
+
 pub type DependencyPath = std::path::PathBuf;
 
 pub mod ctan;
+
+#[allow(dead_code)]
+pub struct DependencyDownload<'a> {
+    name: &'a DependencyName<'a>,
+    payload: DependencyPayload,
+}
+
+#[allow(dead_code)]
+#[derive(Debug)]
+pub struct DependencyPayload {
+    bytes: Vec<u8>,
+    format: DownloadFormat,
+}
+
+#[derive(Debug)]
+pub enum DownloadFormat {
+    Zip,
+}
 
 pub fn get_dependency_paths(deps: &conf::Dependencies) -> Vec<DependencyPath> {
     deps.into_iter()
@@ -44,19 +64,69 @@ impl<'w> WebClient<'w> {
         })
     }
 
-    pub async fn install_dependencies(&self, deps: &conf::Dependencies<'_>) -> Result<()> {
-        let _downloads: FuturesUnordered<_> = deps
+    pub fn download_dependencies<'a>(
+        &'a self,
+        deps: &'a conf::Dependencies<'a>,
+    ) -> impl futures::stream::Stream<Item = Result<DependencyDownload<'a>>> {
+        let downloads: FuturesUnordered<_> = deps
             .into_iter()
-            .map(|(name, spec)| self.install_dependency(name, spec))
+            .map(|(name, spec)| self.download_dependency(name, spec))
             .collect();
-        todo!();
+        downloads
     }
 
-    pub async fn install_dependency(
+    pub async fn download_dependency<'a>(
+        &'a self,
+        name: &'a DependencyName<'a>,
+        spec: &Dependency<'a>,
+    ) -> Result<DependencyDownload<'a>> {
+        match spec {
+            Dependency::Version(version) => self.download_ctan_dependency(name, version),
+            Dependency::Path { .. } => todo!(),
+            Dependency::Ctan { version } => self.download_ctan_dependency(name, version),
+            Dependency::Git { .. } => todo!(),
+        }
+        .await
+    }
+
+    pub async fn download_ctan_dependency<'a>(
+        &'a self,
+        name: &'a DependencyName<'a>,
+        version: &conf::DependencyVersion<'a>,
+    ) -> Result<DependencyDownload<'a>> {
+        let meta = self.get_ctan_pkg_metadata(name, version).await?;
+        let payload = match meta.ctan {
+            Some(ctan) => self.download_from_ctan_location(ctan).await,
+            None => Err(anyhow::anyhow!(
+                "package metadata contained no CTAN location"
+            )),
+        }?;
+        Ok(DependencyDownload { name, payload })
+    }
+
+    async fn get_ctan_pkg_metadata(
         &self,
-        _name: &DependencyName<'_>,
-        _spec: &Dependency<'_>,
-    ) -> Result<()> {
-        todo!();
+        name: &DependencyName<'_>,
+        version: &conf::DependencyVersion<'_>,
+    ) -> Result<ctan::Package> {
+        let url = format!("{}/json/2.0/pkg/{}", &self.ctan_root_url, name);
+        let req = self.inner.get(url);
+        let req = match version {
+            conf::DependencyVersion::Any => req,
+            conf::DependencyVersion::Version(_version) => {
+                unimplemented!("It appears that CTAN doesn't actually provide past versions");
+            }
+        };
+        let package = req.send().await?.json().await?;
+        Ok(package)
+    }
+
+    async fn download_from_ctan_location(&self, ctan: CtanLocation) -> Result<DependencyPayload> {
+        let url = format!("{}/tex-archive/{}.zip", self.ctan_root_url, ctan.path);
+        let bytes = self.inner.get(url).send().await?.bytes().await?.into();
+        Ok(DependencyPayload {
+            bytes,
+            format: DownloadFormat::Zip,
+        })
     }
 }

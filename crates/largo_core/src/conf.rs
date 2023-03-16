@@ -322,7 +322,7 @@ pub struct ProjectSettings {
     pub synctex: Option<bool>,
 }
 
-#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(transparent)]
 pub struct DependencyName<'c>(&'c str);
 
@@ -386,6 +386,30 @@ pub enum Dependency<'c> {
     },
 }
 
-pub type DependencyVersion<'c> = &'c str;
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(from = "&'c str", into = "&'c str")]
+pub enum DependencyVersion<'c> {
+    Any,
+    Version(&'c str),
+}
+
+impl<'c> From<&'c str> for DependencyVersion<'c> {
+    fn from(version: &'c str) -> Self {
+        if version == "*" {
+            Self::Any
+        } else {
+            Self::Version(version)
+        }
+    }
+}
+
+impl<'c> Into<&'c str> for DependencyVersion<'c> {
+    fn into(self) -> &'c str {
+        match self {
+            DependencyVersion::Any => "*",
+            DependencyVersion::Version(s) => s,
+        }
+    }
+}
 
 pub type Url<'c> = &'c str;
