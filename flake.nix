@@ -20,7 +20,11 @@
           inherit (fenix.packages.${system}.minimal) cargo rustc;
         };
 
-        darwinBuildInputs = with pkgs; [ pkgconfig libiconv ];
+        darwinBuildInputs = with pkgs; [
+          pkgconfig
+          libiconv
+          darwin.apple_sdk.frameworks.Security
+        ];
 
         buildInputs = [ ]
           ++ pkgs.lib.optionals pkgs.stdenv.isDarwin darwinBuildInputs;
