@@ -1,21 +1,29 @@
 //! Tools for finding, downloading, installing, etc., project dependencies.
 
+use crate::{
+    conf::{self, Dependency, DependencyName},
+    Result,
+};
+
+use futures::stream::futures_unordered::FuturesUnordered;
+
 pub type DependencyPath = std::path::PathBuf;
 
 pub mod ctan;
 
-use crate::Result;
-
-pub fn get_dependency_paths(deps: &crate::conf::Dependencies) -> Vec<DependencyPath> {
-    use crate::conf::DependencyKind;
+pub fn get_dependency_paths(deps: &conf::Dependencies) -> Vec<DependencyPath> {
     deps.into_iter()
-        .filter_map(|(_, dep)| {
-            if dep.largo {
-                unimplemented!("We don't yet support Largo dependencies");
+        .filter_map(|(_, dep)| match dep {
+            Dependency::Version(_) => unimplemented!(),
+            Dependency::Path { path, largo } => {
+                if *largo {
+                    unimplemented!("We don't yet support Largo dependencies");
+                }
+                let path: std::path::PathBuf = path.to_path_buf();
+                Some(path)
             }
-            match dep.kind {
-                DependencyKind::Path { path } => Some(path.to_owned()),
-            }
+            Dependency::Ctan { .. } => unimplemented!(),
+            Dependency::Git { .. } => unimplemented!(),
         })
         .collect()
 }
@@ -34,5 +42,21 @@ impl<'w> WebClient<'w> {
             inner,
             ctan_root_url: "https://www.ctan.org/",
         })
+    }
+
+    pub async fn install_dependencies(&self, deps: &conf::Dependencies<'_>) -> Result<()> {
+        let _downloads: FuturesUnordered<_> = deps
+            .into_iter()
+            .map(|(name, spec)| self.install_dependency(name, spec))
+            .collect();
+        todo!();
+    }
+
+    pub async fn install_dependency(
+        &self,
+        _name: &DependencyName<'_>,
+        _spec: &Dependency<'_>,
+    ) -> Result<()> {
+        todo!();
     }
 }

@@ -366,19 +366,26 @@ impl<'a> IntoIterator for &'a Dependencies<'a> {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct Dependency<'c> {
-    #[serde(default)]
-    pub largo: bool,
-    #[serde(flatten, borrow)]
-    pub kind: DependencyKind<'c>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", untagged)]
-pub enum DependencyKind<'c> {
+pub enum Dependency<'c> {
+    Version(DependencyVersion<'c>),
     Path {
-        #[serde(borrow)]
         path: &'c std::path::Path,
+        #[serde(default)]
+        largo: bool,
+    },
+    Ctan {
+        #[serde(borrow)]
+        version: DependencyVersion<'c>,
+    },
+    Git {
+        #[serde(borrow)]
+        url: Url<'c>,
+        #[serde(default)]
+        largo: bool,
     },
 }
+
+pub type DependencyVersion<'c> = &'c str;
+
+pub type Url<'c> = &'c str;
