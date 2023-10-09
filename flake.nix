@@ -21,7 +21,7 @@
         };
 
         darwinBuildInputs = with pkgs; [
-          pkgconfig
+          pkg-config
           libiconv
           darwin.apple_sdk.frameworks.Security
         ];
