@@ -94,6 +94,8 @@ pub trait EngineBuilder: private::CommandBuilder + Sized {
 
     fn with_synctex(self, use_synctex: bool) -> Result<Self>;
 
+    fn with_draft_mode(self, draft_mode: bool) -> Result<Self>;
+
     /// This function takes an `Option<bool>` because many TeX engines have two
     /// flags, `-shell-escape` and `-no-shell-escape`, and I'm not sure they
     /// aren't simple opposites.

@@ -299,7 +299,7 @@ impl ProjectSubcommand {
                     ));
                 }
 
-                // Check the correctenss of the cache tag
+                // Check the correctness of the cache tag
                 let expected = files::CACHEDIR_TAG_SIGNATURE;
                 let contents = {
                     let cache_tag_file = typedir::pathref!(target_dir => dirs::CachedirTagFile);

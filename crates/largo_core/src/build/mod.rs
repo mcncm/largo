@@ -15,7 +15,7 @@ impl<'a> crate::vars::LargoVars<'a> {
             profile: settings.profile_name,
             bibliography: settings.conf.bib.bibliography,
             // FIXME: unnecessary allocation
-            output_directory: settings.build_dir.clone(),
+            output_directory: settings.dirs.build.clone(),
         }
     }
 }
@@ -74,10 +74,17 @@ impl<'a> BuildBuilder<'a> {
         let project = self.project;
         let profile_name = self.profile.unwrap_or(self.conf.default_profile);
         let project_name = project.config.project.name;
-        let root_dir = project.root;
-        let src_dir = root_dir.clone().extend(());
-        let target_dir = root_dir.clone().extend(());
-        let build_dir = target_dir.clone().extend(&profile_name).extend(());
+
+        let root = project.root;
+        let src = root.clone().extend(());
+        let target = root.clone().extend(());
+        let build = target.clone().extend(&profile_name).extend(());
+        let dirs = BuildDirs {
+            root,
+            src,
+            target,
+            build,
+        };
         let mut profiles = project.config.profiles.unwrap_or_default();
         profiles.merge_left(crate::conf::Profiles::standard());
         let profile = profiles
@@ -89,10 +96,7 @@ impl<'a> BuildBuilder<'a> {
         let dependencies = project.config.dependencies;
         Ok(BuildBuilderUnpacked {
             conf,
-            root_dir,
-            src_dir,
-            target_dir,
-            build_dir,
+            dirs,
             project_name,
             profile_name,
             system_settings: proj_conf.system_settings,
@@ -108,15 +112,21 @@ impl<'a> BuildBuilder<'a> {
     }
 }
 
+/// Build directories
+#[derive(Debug)]
+struct BuildDirs {
+    root: P<dirs::RootDir>,
+    src: P<dirs::SrcDir>,
+    target: P<dirs::TargetDir>,
+    build: P<dirs::BuildDir>,
+}
+
 /// An intermediate state of unpackaging and treating all the data we've
 /// received
 #[derive(Debug)]
 struct BuildBuilderUnpacked<'a> {
     conf: &'a LargoConfig<'a>,
-    root_dir: P<dirs::RootDir>,
-    src_dir: P<dirs::SrcDir>,
-    target_dir: P<dirs::TargetDir>,
-    build_dir: P<dirs::BuildDir>,
+    dirs: BuildDirs,
     profile_name: ProfileName<'a>,
     project_name: &'a str,
     system_settings: SystemSettings,
@@ -145,9 +155,10 @@ impl<'a> BuildBuilderUnpacked<'a> {
             .engine_builder()
             // Yes, these are extraneous clones. I want to be sure first what
             // lifetime the `Engine` should really have.
-            .with_src_dir(self.src_dir.clone())
-            .with_build_dir(self.build_dir.clone())
+            .with_src_dir(self.dirs.src.clone())
+            .with_build_dir(self.dirs.build.clone())
             .with_verbosity(&self.verbosity)
+            .with_draft_mode(self.project_settings.draft_mode.unwrap_or_default())?
             .with_synctex(self.project_settings.synctex.unwrap_or_default())?
             .with_shell_escape(self.project_settings.shell_escape)?
             .with_dependencies(&crate::dependencies::get_dependency_paths(
@@ -161,10 +172,10 @@ impl<'a> BuildBuilderUnpacked<'a> {
         // FIXME this should happen *at build time*, right?
         let largo_vars = LargoVars::from_build_settings(&self);
         BuildCtx {
-            root_dir: self.root_dir,
-            src_dir: self.src_dir,
-            target_dir: self.target_dir,
-            build_dir: self.build_dir,
+            root_dir: self.dirs.root,
+            src_dir: self.dirs.src,
+            target_dir: self.dirs.target,
+            build_dir: self.dirs.build,
             profile_name: self.profile_name,
             project_name: self.project_name,
             vars: largo_vars,

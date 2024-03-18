@@ -63,6 +63,11 @@ impl EngineBuilder for PdflatexBuilder {
         Ok(self)
     }
 
+    fn with_draft_mode(mut self, draft_mode: bool) -> Result<Self> {
+        self.cli_options.draftmode = draft_mode;
+        Ok(self)
+    }
+
     fn with_jobname(mut self, jobname: String) -> Result<Self> {
         self.cli_options.jobname = Some(jobname);
         Ok(self)
@@ -187,7 +192,7 @@ pub type ConfigurationFileLine = String;
 
 pub type TcxName = String;
 
-/// Syntex option type
+/// Synctex option type
 pub type SynctexNumber = i32;
 
 pub const SYNCTEX_GZIPPED: SynctexNumber = 1;
@@ -198,6 +203,7 @@ pub const SYNCTEX_UNZIPPED: SynctexNumber = -1;
 /// Kpathsea debug option type
 pub type KpathseaNumber = i32;
 
+/// Command line options for the `pdflatex` engine.
 #[allow(dead_code)]
 #[derive(Debug, Default, clam::Options)]
 #[clam(case_convention = "one_dash_kebab_case")]

@@ -302,6 +302,8 @@ pub struct Profile {
     pub project_settings: ProjectSettings,
 }
 
+/// Which TeX system components to use: the TeX format, TeX engine, bibliography
+/// engine, and so on.
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct SystemSettings {
@@ -310,6 +312,7 @@ pub struct SystemSettings {
     pub bib_engine: Option<BibEngine>,
 }
 
+/// Project-specific configuration such as shell-escape and synctex.
 #[derive(Debug, Default, Deserialize, Serialize, Merge)]
 #[serde(rename_all = "kebab-case")]
 pub struct ProjectSettings {
@@ -317,9 +320,11 @@ pub struct ProjectSettings {
     /// Whether to use shell-escape (if present and `true`), no-shell-escape (if
     /// present and `false`), or neither.
     pub shell_escape: Option<bool>,
-    /// whether to use SyncTeX to synchronize between TeX source and the
+    /// Whether to use SyncTeX to synchronize between TeX source and the
     /// compiled document
     pub synctex: Option<bool>,
+    /// Whether to compile in draft mode (omit images, etc.)
+    pub draft_mode: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, Deserialize, Serialize)]
