@@ -1,3 +1,6 @@
+> [!NOTE]  
+> I'm making this repository public to show off my work, but I'm no longer working on or maintaining this in any way! Not only is it an absurdly uphill battle, it's one that's no longer worth fighting. [Typst](https://typst.app) exists, and it solves 90% of my problems with TeX. I'm glad someone bit that bullet.
+
 # Largo
 
 Largo is a (La)TeX build tool I'm writing to bring an "it just works" experience to my (*my*, not your) TeX projects, namely my papers, talks, and thesis. It was inspired by the eminently pleasant `cargo` build tool for the Rust programming language. In fact, I like `cargo` so much that `largo` is practically a clone, although I've never looked at the source code of the former. You might say it's a bit of `cargo`-cult software.
